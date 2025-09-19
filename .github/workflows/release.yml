@@ -1,0 +1,43 @@
+name: GitHub CI
+
+on:
+  push:
+    # バージョン指定つきタグがプッシュされた時のみ実行
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        # クロスプラットフォーム・ビルド
+        platform: [macos-latest, ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      # Actions の基本設定
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      # Node.js のセットアップ
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      # 依存パッケージのインストール
+      - name: Install dependencies
+        run: npm ci
+
+      # ネイティブモジュールの再ビルド
+      - name: Rebuild native modules
+        run: npm run rebuild-native
+
+      # GitHub releases へデプロイ
+      - name: Deploy
+        env:
+          # GITHUB_TOKEN は自動生成されるのでとくに設定は不要
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # NPM スクリプト名は 'release' にすることが必須
+        run: npm run release
