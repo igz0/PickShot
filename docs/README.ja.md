@@ -2,6 +2,16 @@
 
 Electron と React で構築した画像分類ソフトです。大量の画像を読み込みながら星評価でふるい分け、リッチなアニメーションとキーボード操作でテンポよく選別できます。
 
+## ダウンロード
+
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/igz0/pickshot)](https://github.com/igz0/pickshot/releases/latest)
+
+**[📥 最新版をダウンロード](https://github.com/igz0/pickshot/releases/latest)**
+
+- **Windows**: `.exe` インストーラーまたは `.zip` ポータブル版をダウンロード
+- **macOS**: `.dmg` ファイルをダウンロード (Intel および Apple Silicon 対応)
+- **Linux**: `.AppImage` ファイルをダウンロード
+
 ## ハイライト
 
 - サブフォルダーを含めた画像フォルダーの一括スキャン (隠しファイルはスキップ)

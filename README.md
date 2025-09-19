@@ -8,6 +8,15 @@ PickShot is an Electron + React photo culling tool designed for fast triage of l
 
 > 日本語での詳細な説明は [docs/README.ja.md](docs/README.ja.md) を参照してください。
 
+## Download
+
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/igz0/pickshot)](https://github.com/igz0/pickshot/releases/latest)
+
+**[📥 Download the latest release](https://github.com/igz0/pickshot/releases/latest)**
+
+- **Windows**: Download the `.exe` installer or `.zip` portable version
+- **macOS**: Download the `.dmg` file (Intel and Apple Silicon supported)
+- **Linux**: Download the `.AppImage` file
 
 ## Highlights
 
