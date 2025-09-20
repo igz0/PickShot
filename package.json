@@ -51,10 +51,14 @@
     "directories": {
       "output": "release"
     },
-    "files": ["dist/**"],
+    "files": [
+      "dist/**"
+    ],
     "asar": true,
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "category": "public.app-category.photography",
       "identity": null,
       "hardenedRuntime": false,
@@ -68,7 +72,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
@@ -82,7 +88,7 @@
   },
   "postinstall": "npm run rebuild-native",
   "volta": {
-    "node": "24.8.0",
+    "node": "22.19.0",
     "npm": "10.8.2"
   }
 }
