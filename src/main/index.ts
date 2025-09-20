@@ -4,7 +4,13 @@ import type { Dirent } from "node:fs";
 import { mkdir, readdir, rename, stat } from "node:fs/promises";
 import { basename, dirname, extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { type Locale, isLocale, resolveLocale, translate } from "@shared/i18n";
+import {
+  type Locale,
+  defaultLocale,
+  isLocale,
+  resolveLocale,
+  translate,
+} from "@shared/i18n";
 import type {
   DeletePhotoResult,
   PhotoCollectionPayload,
@@ -115,7 +121,42 @@ const enqueuedThumbnailTargets = new Set<string>();
 let activeThumbnailJobs = 0;
 
 const windows = new Set<BrowserWindow>();
-let currentLocale: Locale = resolveLocale(app.getLocale());
+
+// Prefer the user's OS language list to avoid defaulting to English when
+// Electron lacks bundled locale data (e.g. Japanese Windows without ja.pak).
+function detectInitialLocale(): Locale {
+  const candidates: Array<string | null | undefined> = [];
+
+  if (typeof app.getPreferredSystemLanguages === "function") {
+    const preferred = app.getPreferredSystemLanguages();
+    if (Array.isArray(preferred)) {
+      candidates.push(...preferred);
+    }
+  }
+
+  candidates.push(
+    app.getLocale(),
+    process.env.LC_ALL,
+    process.env.LC_MESSAGES,
+    process.env.LANG,
+    process.env.LANGUAGE,
+  );
+
+  for (const entry of candidates) {
+    if (!entry) {
+      continue;
+    }
+    const trimmed = entry.trim();
+    if (!trimmed) {
+      continue;
+    }
+    return resolveLocale(trimmed);
+  }
+
+  return defaultLocale;
+}
+
+let currentLocale: Locale = detectInitialLocale();
 
 function broadcastRatingsRefreshed(updates: Record<string, number>): void {
   if (!updates || Object.keys(updates).length === 0) {
