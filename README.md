@@ -1,12 +1,12 @@
 # PickShot
 
-https://github.com/user-attachments/assets/1f9b17a2-0833-4e67-91cd-03d7ab999726
-
 ## Overview
 
 PickShot is an Electron + React photo culling tool designed for fast triage of large image libraries. It lets you blaze through shoots with star ratings, fluid animations, and keyboard-driven workflows.
 
 > 日本語での詳細な説明は [docs/README.ja.md](docs/README.ja.md) を参照してください。
+
+https://github.com/user-attachments/assets/1f9b17a2-0833-4e67-91cd-03d7ab999726
 
 ## Download
 
