@@ -1181,7 +1181,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={handleClearDirectory}
-                className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-indigo-400/40 bg-indigo-500/10 text-indigo-100 transition hover:bg-indigo-400/30 hover:text-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-indigo-400/40 bg-indigo-500/10 text-indigo-100 transition hover:bg-indigo-400/30 hover:text-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300 disabled:cursor-not-allowed disabled:opacity-50"
                 title={t("app.actions.clearFolder")}
                 aria-label={t("app.actions.clearFolder")}
                 disabled={isLoading}
