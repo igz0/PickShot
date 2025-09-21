@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import type { MouseEvent } from "react";
 import { useEffect, useState } from "react";
 import { useI18n } from "../i18n/I18nProvider";
 import type { RatedPhoto } from "../types";
@@ -7,7 +8,7 @@ import RatingStars from "./RatingStars";
 interface PhotoCardProps {
   photo: RatedPhoto;
   isSelected: boolean;
-  onSelect: (id: string) => void;
+  onSelect: (photo: RatedPhoto, event?: MouseEvent<HTMLDivElement>) => void;
   onRate: (id: string, rating: number) => void;
   onContextMenu: (
     photo: RatedPhoto,
@@ -49,9 +50,11 @@ export default function PhotoCard({
     <motion.div
       layout
       className={cardClass}
-      onClick={() => onSelect(photo.id)}
+      onClick={(event) => {
+        onSelect(photo, event);
+      }}
       onDoubleClick={() => {
-        onSelect(photo.id);
+        onSelect(photo);
         onExpand(photo);
       }}
       onContextMenu={(event) => {

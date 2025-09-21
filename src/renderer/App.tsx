@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   CSSProperties,
   DragEvent as ReactDragEvent,
+  MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
 } from "react";
 import PhotoContextMenu from "./components/PhotoContextMenu";
@@ -80,6 +81,21 @@ function extractLabel(filePath: string): string {
   return segments[segments.length - 1];
 }
 
+function arraysEqual<T>(a: readonly T[], b: readonly T[]): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (a.length !== b.length) {
+    return false;
+  }
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index] !== b[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
 const DEFAULT_PREVIEW_WIDTH = 380;
 const MIN_PREVIEW_WIDTH = 260;
 const MAX_PREVIEW_WIDTH = 720;
@@ -122,7 +138,8 @@ function clampPreviewWidth(width: number, containerWidth: number): number {
 export default function App() {
   const { t, locale, formatNumber, formatPhotoCount } = useI18n();
   const [photos, setPhotos] = useState<RatedPhoto[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [focusId, setFocusId] = useState<string | null>(null);
   const [directory, setDirectory] = useState<DirectoryEntry | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
@@ -219,9 +236,31 @@ export default function App() {
   }, [filterMode, locale, photos, ratingFilter, sortKey]);
   const displayedCount = displayedPhotos.length;
 
-  const selectedPhoto = useMemo(
-    () => displayedPhotos.find((photo) => photo.id === selectedId) ?? null,
-    [displayedPhotos, selectedId],
+  const selectedIdSet = useMemo(
+    () => new Set(selectedIds),
+    [selectedIds],
+  );
+
+  const primarySelectedId = useMemo(() => {
+    if (focusId && selectedIdSet.has(focusId)) {
+      return focusId;
+    }
+    return selectedIds[selectedIds.length - 1] ?? null;
+  }, [focusId, selectedIdSet, selectedIds]);
+
+  const selectedPhotos = useMemo(
+    () => displayedPhotos.filter((photo) => selectedIdSet.has(photo.id)),
+    [displayedPhotos, selectedIdSet],
+  );
+
+  const selectionCount = selectedPhotos.length;
+
+  const primarySelectedPhoto = useMemo(
+    () =>
+      primarySelectedId
+        ? displayedPhotos.find((photo) => photo.id === primarySelectedId) ?? null
+        : null,
+    [displayedPhotos, primarySelectedId],
   );
 
   const mergePhotos = useCallback(
@@ -303,7 +342,14 @@ export default function App() {
 
       const nextPhotos = mergePhotos(payload.photos, payload.ratings);
       updateDirectory(payload.directory, payload.photos.length);
-      setSelectedId(nextPhotos[0]?.id ?? null);
+      const initialId = nextPhotos[0]?.id ?? null;
+      if (initialId) {
+        setSelectedIds([initialId]);
+        setFocusId(initialId);
+      } else {
+        setSelectedIds([]);
+        setFocusId(null);
+      }
     },
     [mergePhotos, updateDirectory],
   );
@@ -322,7 +368,8 @@ export default function App() {
 
   const handleClearDirectory = useCallback(() => {
     setPhotos([]);
-    setSelectedId(null);
+    setSelectedIds([]);
+    setFocusId(null);
     setDirectory(null);
     setExpandedPhotoId(null);
     setContextMenu(null);
@@ -344,77 +391,166 @@ export default function App() {
       });
   }, [directory]);
 
-  const handleRate = useCallback(
-    (id: string, rating: number) => {
-      const ratingFilterSet =
-        ratingFilter.length > 0 ? new Set(ratingFilter) : null;
-      const isFilterActive =
-        filterMode !== "all" || (ratingFilterSet?.size ?? 0) > 0;
-      const currentFilteredIds = isFilterActive
-        ? displayedPhotos.map((photo) => photo.id)
-        : [];
-      const selectedIndex =
-        selectedId && isFilterActive
-          ? currentFilteredIds.findIndex((photoId) => photoId === selectedId)
-          : -1;
-      const nextCandidateId =
-        selectedIndex !== -1 ? currentFilteredIds[selectedIndex + 1] : null;
-      const previousCandidateId =
-        selectedIndex > 0 ? currentFilteredIds[selectedIndex - 1] : null;
+  const applyUniformRating = useCallback((ids: string[], rating: number) => {
+    if (!ids.length) {
+      return;
+    }
 
-      setPhotos((prev) => {
-        const next = prev.map((photo) =>
-          photo.id === id ? { ...photo, rating } : photo,
-        );
+    const targetIds = new Set(ids);
+    setPhotos((prev) =>
+      prev.map((photo) =>
+        targetIds.has(photo.id) ? { ...photo, rating } : photo,
+      ),
+    );
 
-        if (isFilterActive) {
-          const filteredPhotos = next.filter((photo) =>
-            shouldIncludePhoto(photo, filterMode, ratingFilterSet),
-          );
-          if (
-            selectedId &&
-            !filteredPhotos.some((photo) => photo.id === selectedId)
-          ) {
-            const candidateOrder = [
-              nextCandidateId,
-              previousCandidateId,
-              filteredPhotos[0]?.id ?? null,
-            ].filter((candidate): candidate is string => Boolean(candidate));
-            const nextSelection = candidateOrder.find((candidate) =>
-              filteredPhotos.some((photo) => photo.id === candidate),
-            );
-            setSelectedId(nextSelection ?? null);
+    void Promise.all(
+      ids.map((id) =>
+        window.api.updateRating({ id, rating }).then((result) => {
+          if (!result.success && result.message) {
+            console.error("Failed to persist rating", result.message);
           }
-        }
+          return result;
+        }),
+      ),
+    ).catch((error) => {
+      console.error("Failed to persist ratings", error);
+    });
+  }, []);
 
-        return next;
-      });
+  const applyRelativeRating = useCallback(
+    (targets: RatedPhoto[], delta: number) => {
+      if (!targets.length || delta === 0) {
+        return;
+      }
 
-      void window.api.updateRating({ id, rating }).then((result) => {
-        if (!result.success && result.message) {
-          console.error("Failed to persist rating", result.message);
-        }
+      const updates = targets
+        .map((photo) => {
+          const nextRating = Math.max(0, Math.min(5, photo.rating + delta));
+          if (nextRating === photo.rating) {
+            return null;
+          }
+          return { id: photo.id, rating: nextRating };
+        })
+        .filter((entry): entry is { id: string; rating: number } => Boolean(entry));
+
+      if (!updates.length) {
+        return;
+      }
+
+      const updateMap = new Map(updates.map((entry) => [entry.id, entry.rating]));
+      setPhotos((prev) =>
+        prev.map((photo) =>
+          updateMap.has(photo.id)
+            ? { ...photo, rating: updateMap.get(photo.id)! }
+            : photo,
+        ),
+      );
+
+      void Promise.all(
+        updates.map((entry) =>
+          window.api.updateRating(entry).then((result) => {
+            if (!result.success && result.message) {
+              console.error("Failed to persist rating", result.message);
+            }
+            return result;
+          }),
+        ),
+      ).catch((error) => {
+        console.error("Failed to persist ratings", error);
       });
     },
-    [displayedPhotos, filterMode, ratingFilter, selectedId],
+    [],
+  );
+
+  const handleRate = useCallback(
+    (id: string, rating: number) => {
+      applyUniformRating([id], rating);
+    },
+    [applyUniformRating],
   );
 
   const handleRatingFilterChange = useCallback((next: number[]) => {
     setRatingFilter(next);
   }, []);
 
-  const handleSelect = useCallback((id: string) => {
-    setSelectedId(id);
-  }, []);
+  const handleSelect = useCallback(
+    (photo: RatedPhoto, event?: ReactMouseEvent<HTMLDivElement>) => {
+      const isToggle = Boolean(event?.metaKey || event?.ctrlKey);
+      const isRange = Boolean(event?.shiftKey && focusId);
+      const anchorId = focusId;
+
+      setSelectedIds((current) => {
+        let next: string[];
+
+        if (isRange && anchorId) {
+          const anchorIndex = displayedPhotos.findIndex(
+            (item) => item.id === anchorId,
+          );
+          const targetIndex = displayedPhotos.findIndex(
+            (item) => item.id === photo.id,
+          );
+          if (anchorIndex === -1 || targetIndex === -1) {
+            next = [photo.id];
+          } else {
+            const start = Math.min(anchorIndex, targetIndex);
+            const end = Math.max(anchorIndex, targetIndex);
+            next = displayedPhotos
+              .slice(start, end + 1)
+              .map((item) => item.id);
+          }
+        } else if (isToggle) {
+          if (current.includes(photo.id)) {
+            next = current.filter((id) => id !== photo.id);
+          } else {
+            next = [...current, photo.id];
+          }
+        } else {
+          next = [photo.id];
+        }
+
+        let nextFocus = focusId;
+        if (isRange) {
+          nextFocus = photo.id;
+        } else if (isToggle) {
+          if (current.includes(photo.id)) {
+            if (focusId === photo.id) {
+              nextFocus = next[next.length - 1] ?? null;
+            }
+          } else {
+            nextFocus = photo.id;
+          }
+        } else {
+          nextFocus = photo.id;
+        }
+
+        setFocusId(nextFocus ?? null);
+        return next;
+      });
+    },
+    [displayedPhotos, focusId],
+  );
 
   const handleExpand = useCallback((photo: RatedPhoto) => {
-    setSelectedId(photo.id);
+    setSelectedIds((current) => {
+      if (current.length === 1 && current[0] === photo.id) {
+        return current;
+      }
+      return [photo.id];
+    });
+    setFocusId(photo.id);
     setExpandedPhotoId(photo.id);
   }, []);
 
   const handleContextMenuRequest = useCallback(
     (photo: RatedPhoto, position: { x: number; y: number }) => {
-      setSelectedId(photo.id);
+      setSelectedIds((current) => {
+        if (current.includes(photo.id)) {
+          setFocusId(photo.id);
+          return current;
+        }
+        setFocusId(photo.id);
+        return [photo.id];
+      });
       setContextMenu({ photo, position });
     },
     [],
@@ -431,34 +567,55 @@ export default function App() {
   const moveSelection = useCallback(
     (offset: number) => {
       if (!displayedPhotos.length) return;
-      setSelectedId((current) => {
-        const currentIndex = current
-          ? displayedPhotos.findIndex((photo) => photo.id === current)
-          : -1;
-        const fallbackIndex = offset > 0 ? 0 : displayedPhotos.length - 1;
-        if (currentIndex === -1) {
-          return displayedPhotos[fallbackIndex]?.id ?? null;
+      const currentIndex = focusId
+        ? displayedPhotos.findIndex((photo) => photo.id === focusId)
+        : -1;
+      const baseIndex =
+        currentIndex === -1
+          ? offset > 0
+            ? 0
+            : displayedPhotos.length - 1
+          : currentIndex;
+      if (baseIndex < 0) {
+        return;
+      }
+      const nextIndex = baseIndex + offset;
+      const effectiveIndex =
+        nextIndex < 0 || nextIndex >= displayedPhotos.length
+          ? baseIndex
+          : nextIndex;
+      const nextPhoto = displayedPhotos[effectiveIndex];
+      if (!nextPhoto) {
+        return;
+      }
+      setFocusId(nextPhoto.id);
+      setSelectedIds((current) => {
+        if (current.length === 1 && current[0] === nextPhoto.id) {
+          return current;
         }
-
-        const nextIndex = currentIndex + offset;
-        if (nextIndex < 0 || nextIndex >= displayedPhotos.length) {
-          return displayedPhotos[currentIndex]?.id ?? null;
-        }
-
-        return displayedPhotos[nextIndex]?.id ?? null;
+        return [nextPhoto.id];
       });
     },
-    [displayedPhotos],
+    [displayedPhotos, focusId],
   );
 
   const selectEdge = useCallback(
     (direction: "start" | "end") => {
       if (!displayedPhotos.length) return;
-      setSelectedId(
+      const nextPhoto =
         direction === "start"
-          ? (displayedPhotos[0]?.id ?? null)
-          : (displayedPhotos[displayedPhotos.length - 1]?.id ?? null),
-      );
+          ? displayedPhotos[0]
+          : displayedPhotos[displayedPhotos.length - 1];
+      if (!nextPhoto) {
+        return;
+      }
+      setFocusId(nextPhoto.id);
+      setSelectedIds((current) => {
+        if (current.length === 1 && current[0] === nextPhoto.id) {
+          return current;
+        }
+        return [nextPhoto.id];
+      });
     },
     [displayedPhotos],
   );
@@ -547,84 +704,110 @@ export default function App() {
     setContextMenu(null);
   }, []);
 
-  const handleDelete = useCallback(
-    async (photo: RatedPhoto) => {
-      const confirmed = window.confirm(
-        t("app.confirm.delete", { name: photo.name }),
-      );
+  const deletePhotos = useCallback(
+    async (targets: RatedPhoto[]) => {
+      if (!targets.length) {
+        return;
+      }
 
+      const confirmationMessage =
+        targets.length === 1
+          ? t("app.confirm.delete", { name: targets[0].name })
+          : t("app.confirm.deleteMany", {
+            count: formatNumber(targets.length),
+          });
+
+      const confirmed = window.confirm(confirmationMessage);
       if (!confirmed) {
         return;
       }
 
-      const currentIndex = displayedPhotos.findIndex(
-        (item) => item.id === photo.id,
-      );
-      const nextSelectionId =
-        displayedPhotos[currentIndex + 1]?.id ??
-        displayedPhotos[currentIndex - 1]?.id ??
-        null;
+      const successfulIds: string[] = [];
+      const failed: Array<{ photo: RatedPhoto; result: DeletePhotoResult | null }> = [];
 
-      let result: DeletePhotoResult;
-      try {
-        result = await window.api.deletePhoto(photo.filePath);
-      } catch (error) {
-        console.error(error);
-        window.alert(t("app.error.deleteUnexpected"));
-        return;
-      }
-
-      if (!result.success) {
-        window.alert(
-          result.message
-            ? t("app.error.deleteWithReason", { reason: result.message })
-            : t("app.error.delete"),
-        );
-        return;
-      }
-
-      let removed = false;
-
-      setPhotos((prev) => {
-        const filtered = prev.filter((item) => item.id !== photo.id);
-        if (filtered.length !== prev.length) {
-          removed = true;
+      for (const target of targets) {
+        try {
+          const result = await window.api.deletePhoto(target.filePath);
+          if (result.success) {
+            successfulIds.push(target.id);
+          } else {
+            failed.push({ photo: target, result });
+          }
+        } catch (error) {
+          console.error(error);
+          failed.push({ photo: target, result: null });
         }
-        return filtered;
-      });
+      }
 
-      if (!removed) {
-        window.alert(t("app.error.alreadyDeleted"));
+      if (failed.length === targets.length) {
+        const firstFailure = failed[0];
+        const fallbackMessage = firstFailure?.result?.message
+          ? t("app.error.deleteWithReason", {
+            reason: firstFailure.result.message,
+          })
+          : t("app.error.deleteUnexpected");
+        window.alert(fallbackMessage);
         return;
       }
+
+      if (failed.length > 0) {
+        const firstFailure = failed[0];
+        const message = firstFailure?.result?.message
+          ? t("app.error.deleteWithReason", { reason: firstFailure.result.message })
+          : t("app.error.deleteUnexpected");
+        window.alert(message);
+      }
+
+      if (successfulIds.length === 0) {
+        return;
+      }
+
+      const successIdSet = new Set(successfulIds);
+
+      setPhotos((prev) => prev.filter((photo) => !successIdSet.has(photo.id)));
 
       setDirectory((prev) => {
-        if (!prev || !photo.filePath.startsWith(prev.path)) {
+        if (!prev) {
           return prev;
         }
-        const nextCount = Math.max(0, prev.count - 1);
+        const removedCount = targets.filter(
+          (photo) =>
+            successIdSet.has(photo.id) &&
+            photo.filePath.startsWith(prev.path),
+        ).length;
+        if (removedCount === 0) {
+          return prev;
+        }
         return {
           ...prev,
-          count: nextCount,
+          count: Math.max(0, prev.count - removedCount),
         };
       });
 
-      setSelectedId((current) => {
-        if (current !== photo.id) {
-          return current;
-        }
-        if (nextSelectionId && nextSelectionId !== photo.id) {
-          return nextSelectionId;
-        }
-        return null;
-      });
-
+      setSelectedIds((current) => current.filter((id) => !successIdSet.has(id)));
+      setFocusId((current) =>
+        current && successIdSet.has(current) ? null : current,
+      );
       setExpandedPhotoId((current) =>
-        current === photo.id ? (nextSelectionId ?? null) : current,
+        current && successIdSet.has(current) ? null : current,
       );
     },
-    [displayedPhotos, t],
+    [formatNumber, t],
   );
+
+  const handleDelete = useCallback(
+    (photo: RatedPhoto) => {
+      void deletePhotos([photo]);
+    },
+    [deletePhotos],
+  );
+
+  const handleDeleteSelection = useCallback(() => {
+    if (selectedPhotos.length === 0) {
+      return;
+    }
+    void deletePhotos([...selectedPhotos]);
+  }, [deletePhotos, selectedPhotos]);
 
   const handleReveal = useCallback(
     async (photo: RatedPhoto) => {
@@ -649,10 +832,20 @@ export default function App() {
     if (!contextMenu) {
       return;
     }
-    const target = contextMenu.photo;
     closeContextMenu();
+    if (selectionCount > 1) {
+      handleDeleteSelection();
+      return;
+    }
+    const target = contextMenu.photo;
     void handleDelete(target);
-  }, [closeContextMenu, contextMenu, handleDelete]);
+  }, [
+    closeContextMenu,
+    contextMenu,
+    handleDelete,
+    handleDeleteSelection,
+    selectionCount,
+  ]);
 
   const handleContextMenuReveal = useCallback(() => {
     if (!contextMenu) {
@@ -669,8 +862,11 @@ export default function App() {
     }
     const target = contextMenu.photo;
     closeContextMenu();
+    if (selectionCount !== 1) {
+      return;
+    }
     setRenameTarget(target);
-  }, [closeContextMenu, contextMenu]);
+  }, [closeContextMenu, contextMenu, selectionCount]);
 
   const closeRenameDialog = useCallback(() => {
     setRenameTarget(null);
@@ -719,7 +915,15 @@ export default function App() {
         ),
       );
 
-      setSelectedId((current) =>
+      setSelectedIds((current) => {
+        if (!current.includes(renameTarget.id)) {
+          return current;
+        }
+        return current.map((id) =>
+          id === renameTarget.id ? result.photo.id : id,
+        );
+      });
+      setFocusId((current) =>
         current === renameTarget.id ? result.photo.id : current,
       );
       setExpandedPhotoId((current) =>
@@ -746,25 +950,58 @@ export default function App() {
 
   useEffect(() => {
     if (displayedPhotos.length === 0) {
-      if (filterMode === "rated") {
-        if (selectedId !== null) {
-          setSelectedId(null);
-        }
-      } else if (
-        filterMode === "all" &&
-        selectedId === null &&
-        photos.length > 0
-      ) {
-        setSelectedId(photos[0]?.id ?? null);
+      if (selectedIds.length > 0) {
+        setSelectedIds([]);
+      }
+      if (focusId !== null) {
+        setFocusId(null);
       }
       return;
     }
 
-    const exists = displayedPhotos.some((photo) => photo.id === selectedId);
-    if (!exists) {
-      setSelectedId(displayedPhotos[0]?.id ?? null);
+    const displayedIdSet = new Set(displayedPhotos.map((photo) => photo.id));
+    const filteredSelection = selectedIds.filter((id) =>
+      displayedIdSet.has(id),
+    );
+
+    if (selectedIds.length === 0) {
+      if (focusId && !displayedIdSet.has(focusId)) {
+        setFocusId(null);
+      }
+      return;
     }
-  }, [displayedPhotos, filterMode, photos, selectedId]);
+
+    if (filteredSelection.length === 0) {
+      const fallbackId = displayedPhotos[0]?.id ?? null;
+      if (fallbackId) {
+        if (!arraysEqual(selectedIds, [fallbackId])) {
+          setSelectedIds([fallbackId]);
+        }
+        if (focusId !== fallbackId) {
+          setFocusId(fallbackId);
+        }
+      } else {
+        if (selectedIds.length > 0) {
+          setSelectedIds([]);
+        }
+        if (focusId !== null) {
+          setFocusId(null);
+        }
+      }
+      return;
+    }
+
+    if (!arraysEqual(selectedIds, filteredSelection)) {
+      setSelectedIds(filteredSelection);
+    }
+    const nextFocus =
+      focusId && displayedIdSet.has(focusId)
+        ? focusId
+        : filteredSelection[filteredSelection.length - 1] ?? null;
+    if (nextFocus !== focusId) {
+      setFocusId(nextFocus);
+    }
+  }, [displayedPhotos, focusId, selectedIds]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -799,6 +1036,11 @@ export default function App() {
 
       if (event.key === "Escape") {
         let handled = false;
+        if (selectionCount > 0) {
+          handled = true;
+          setSelectedIds([]);
+          setFocusId(null);
+        }
         if (showShortcuts) {
           handled = true;
           setShowShortcuts(false);
@@ -879,46 +1121,47 @@ export default function App() {
 
       if (
         (event.key === "Delete" || event.key === "Backspace") &&
-        selectedPhoto
+        selectionCount > 0
       ) {
         event.preventDefault();
-        void handleDelete(selectedPhoto);
+        handleDeleteSelection();
         return;
       }
 
-      if (event.key === "[" && selectedPhoto) {
+      if (event.key === "[" && selectionCount > 0) {
         event.preventDefault();
-        const nextRating = Math.max(0, selectedPhoto.rating - 1);
-        handleRate(selectedPhoto.id, nextRating);
+        applyRelativeRating(selectedPhotos, -1);
         return;
       }
 
-      if (event.key === "]" && selectedPhoto) {
+      if (event.key === "]" && selectionCount > 0) {
         event.preventDefault();
-        const nextRating = Math.min(5, selectedPhoto.rating + 1);
-        handleRate(selectedPhoto.id, nextRating);
+        applyRelativeRating(selectedPhotos, 1);
         return;
       }
 
-      if (/^[0-5]$/.test(event.key) && selectedPhoto) {
+      if (/^[0-5]$/.test(event.key) && selectionCount > 0) {
         event.preventDefault();
-        handleRate(selectedPhoto.id, Number(event.key));
+        applyUniformRating(selectedIds, Number(event.key));
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
+    applyRelativeRating,
+    applyUniformRating,
     closeContextMenu,
     contextMenu,
     cycleSort,
     expandedPhotoId,
-    handleDelete,
+    handleDeleteSelection,
     handleLoad,
-    handleRate,
     moveSelection,
     selectEdge,
-    selectedPhoto,
+    selectedIds,
+    selectedPhotos,
+    selectionCount,
     showShortcuts,
     toggleFilter,
   ]);
@@ -927,13 +1170,13 @@ export default function App() {
     if (!expandedPhotoId) {
       return;
     }
-    if (selectedPhoto && selectedPhoto.id !== expandedPhotoId) {
-      setExpandedPhotoId(selectedPhoto.id);
+    if (primarySelectedPhoto && primarySelectedPhoto.id !== expandedPhotoId) {
+      setExpandedPhotoId(primarySelectedPhoto.id);
     }
-    if (!selectedPhoto) {
+    if (!primarySelectedPhoto) {
       setExpandedPhotoId(null);
     }
-  }, [expandedPhotoId, selectedPhoto]);
+  }, [expandedPhotoId, primarySelectedPhoto]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1369,7 +1612,7 @@ export default function App() {
             <div className="mt-4 flex min-h-0 flex-1 rounded-2xl bg-slate-950/70">
               <PhotoGrid
                 photos={displayedPhotos}
-                selectedId={selectedId}
+                selectedIds={selectedIds}
                 onSelect={handleSelect}
                 onRate={handleRate}
                 onContextMenu={handleContextMenuRequest}
@@ -1402,9 +1645,10 @@ export default function App() {
                 </div>
                 <div className="flex min-h-0 flex-1">
                   <PhotoPreview
-                    photo={selectedPhoto}
-                    onRate={handleRate}
-                    onDelete={handleDelete}
+                    photos={selectedPhotos}
+                    primaryPhoto={primarySelectedPhoto}
+                    onSetRating={applyUniformRating}
+                    onDelete={deletePhotos}
                     onExpand={handleExpand}
                   />
                 </div>
@@ -1413,9 +1657,10 @@ export default function App() {
           ) : (
             <div className="flex min-h-0 flex-1">
               <PhotoPreview
-                photo={selectedPhoto}
-                onRate={handleRate}
-                onDelete={handleDelete}
+                photos={selectedPhotos}
+                primaryPhoto={primarySelectedPhoto}
+                onSetRating={applyUniformRating}
+                onDelete={deletePhotos}
                 onExpand={handleExpand}
               />
             </div>
@@ -1425,6 +1670,7 @@ export default function App() {
         {contextMenu ? (
           <PhotoContextMenu
             position={contextMenu.position}
+            selectionCount={selectionCount}
             onClose={closeContextMenu}
             onDelete={handleContextMenuDelete}
             onReveal={handleContextMenuReveal}
@@ -1573,7 +1819,7 @@ export default function App() {
           </dialog>
         ) : null}
 
-        {expandedPhotoId && selectedPhoto ? (
+        {expandedPhotoId && primarySelectedPhoto ? (
           <dialog
             className="fixed inset-0 z-40 m-0 flex items-center justify-center bg-[rgba(4,8,18,0.9)] backdrop-blur-lg"
             aria-label={t("app.dialog.preview")}
@@ -1613,12 +1859,12 @@ export default function App() {
             >
               <div className="flex max-h-full w-full max-w-[90vw] flex-col items-center justify-center gap-4">
                 <img
-                  src={selectedPhoto.fileUrl}
-                  alt={selectedPhoto.name}
+                  src={primarySelectedPhoto.fileUrl}
+                  alt={primarySelectedPhoto.name}
                   className="max-h-[80vh] w-auto max-w-full rounded-2xl object-contain shadow-[0_30px_60px_rgba(0,0,0,0.55)]"
                 />
                 <span className="text-sm text-indigo-100">
-                  {selectedPhoto.name}
+                  {primarySelectedPhoto.name}
                 </span>
               </div>
             </div>

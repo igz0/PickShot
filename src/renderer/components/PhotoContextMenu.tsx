@@ -3,6 +3,7 @@ import { useI18n } from "../i18n/I18nProvider";
 
 interface PhotoContextMenuProps {
   position: { x: number; y: number };
+  selectionCount: number;
   onClose: () => void;
   onDelete: () => void;
   onReveal: () => void;
@@ -14,12 +15,20 @@ const MENU_DIMENSIONS = { width: 200, height: 140 };
 
 export default function PhotoContextMenu({
   position,
+  selectionCount,
   onClose,
   onDelete,
   onReveal,
   onRename,
 }: PhotoContextMenuProps) {
-  const { t } = useI18n();
+  const { t, formatNumber } = useI18n();
+  const renameDisabled = selectionCount !== 1;
+  const deleteLabel =
+    selectionCount > 1
+      ? t("app.context.deleteSelected", {
+        count: formatNumber(selectionCount),
+      })
+      : t("app.context.delete");
   const anchoredPosition = useMemo(() => {
     const { innerWidth, innerHeight } = window;
     const maxX = innerWidth - MENU_DIMENSIONS.width - MENU_GAP;
@@ -91,10 +100,14 @@ export default function PhotoContextMenu({
       >
         <button
           type="button"
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors hover:bg-slate-700/60"
+          className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors ${renameDisabled ? "cursor-not-allowed opacity-50" : "hover:bg-slate-700/60"}`}
           onClick={() => {
+            if (renameDisabled) {
+              return;
+            }
             onRename();
           }}
+          disabled={renameDisabled}
         >
           {t("app.context.rename")}
         </button>
@@ -114,7 +127,7 @@ export default function PhotoContextMenu({
             onDelete();
           }}
         >
-          {t("app.context.delete")}
+          {deleteLabel}
         </button>
       </div>
     </div>

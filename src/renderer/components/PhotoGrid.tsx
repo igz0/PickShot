@@ -1,6 +1,10 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { memo, useMemo } from "react";
-import type { DragEvent as ReactDragEvent, ReactNode } from "react";
+import type {
+  DragEvent as ReactDragEvent,
+  MouseEvent,
+  ReactNode,
+} from "react";
 import AutoSizer from "react-virtualized-auto-sizer";
 import { FixedSizeGrid, type GridChildComponentProps } from "react-window";
 import { useI18n } from "../i18n/I18nProvider";
@@ -9,8 +13,8 @@ import PhotoCard from "./PhotoCard";
 
 interface PhotoGridProps {
   photos: RatedPhoto[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
+  selectedIds: string[];
+  onSelect: (photo: RatedPhoto, event?: MouseEvent<HTMLDivElement>) => void;
   onRate: (id: string, rating: number) => void;
   onContextMenu: (
     photo: RatedPhoto,
@@ -31,14 +35,14 @@ const MIN_CELL_WIDTH = 220;
 interface GridData {
   photos: RatedPhoto[];
   columnCount: number;
-  onSelect: (id: string) => void;
+  onSelect: (photo: RatedPhoto, event?: MouseEvent<HTMLDivElement>) => void;
   onRate: (id: string, rating: number) => void;
   onContextMenu: (
     photo: RatedPhoto,
     position: { x: number; y: number },
   ) => void;
   onExpand: (photo: RatedPhoto) => void;
-  selectedId: string | null;
+  selectedIdSet: Set<string>;
 }
 
 const GridCell = memo(
@@ -55,7 +59,7 @@ const GridCell = memo(
       onRate,
       onContextMenu,
       onExpand,
-      selectedId,
+      selectedIdSet,
     } = data;
     const index = rowIndex * columnCount + columnIndex;
     const photo = photos[index];
@@ -64,7 +68,7 @@ const GridCell = memo(
       return null;
     }
 
-    const isSelected = selectedId === photo.id;
+    const isSelected = selectedIdSet.has(photo.id);
 
     const cardClass = `flex h-full flex-col gap-2.5 rounded-2xl border border-indigo-400/10 bg-slate-900/90 p-3 shadow-[0_16px_34px_rgba(0,0,0,0.25)] transition-colors ${
       isSelected
@@ -91,7 +95,7 @@ GridCell.displayName = "GridCell";
 
 export default function PhotoGrid({
   photos,
-  selectedId,
+  selectedIds,
   onSelect,
   onRate,
   onContextMenu,
@@ -104,6 +108,7 @@ export default function PhotoGrid({
   onDrop,
 }: PhotoGridProps) {
   const { t } = useI18n();
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const content = useMemo(() => {
     if (!photos.length) {
       return (
@@ -135,7 +140,7 @@ export default function PhotoGrid({
                 onRate,
                 onContextMenu,
                 onExpand,
-                selectedId,
+                selectedIdSet,
               }}
             >
               {GridCell}
@@ -151,7 +156,7 @@ export default function PhotoGrid({
     onRate,
     onSelect,
     photos,
-    selectedId,
+    selectedIdSet,
     t,
   ]);
 
