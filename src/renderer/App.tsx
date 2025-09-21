@@ -1161,7 +1161,7 @@ export default function App() {
           <div className="space-y-1.5">
             <motion.h1
               layout
-              className="text-2xl font-bold tracking-wide text-slate-100"
+              className="inline-block bg-gradient-to-r from-sky-500 via-indigo-500 to-indigo-700 bg-clip-text text-2xl font-bold tracking-wide text-transparent"
             >
               PickShot
             </motion.h1>
