@@ -14,6 +14,7 @@ import PhotoContextMenu from "./components/PhotoContextMenu";
 import PhotoGrid from "./components/PhotoGrid";
 import PhotoPreview from "./components/PhotoPreview";
 import RenamePhotoDialog from "./components/RenamePhotoDialog";
+import StarFilterMenu from "./components/StarFilterMenu";
 import { useI18n } from "./i18n/I18nProvider";
 import type { RatedPhoto } from "./types";
 
@@ -31,6 +32,32 @@ type SortKey =
   | "nameDesc"
   | "ratingDesc"
   | "ratingAsc";
+
+function shouldIncludePhoto(
+  photo: RatedPhoto,
+  mode: FilterMode,
+  ratingFilter: Set<number> | null,
+): boolean {
+  const matchesMode =
+    mode === "unrated"
+      ? photo.rating === 0
+      : mode === "rated"
+        ? photo.rating > 0
+        : true;
+
+  if (!matchesMode) {
+    return false;
+  }
+
+  if (ratingFilter && ratingFilter.size > 0) {
+    if (photo.rating === 0) {
+      return ratingFilter.has(0);
+    }
+    return ratingFilter.has(photo.rating);
+  }
+
+  return true;
+}
 
 interface PhotoContextMenuState {
   photo: RatedPhoto;
@@ -119,6 +146,7 @@ export default function App() {
     }
     return window.matchMedia("(min-width: 1024px)").matches;
   });
+  const [ratingFilter, setRatingFilter] = useState<number[]>([]);
   const layoutContainerRef = useRef<HTMLDivElement | null>(null);
   const resizeStateRef = useRef({
     startX: 0,
@@ -135,13 +163,31 @@ export default function App() {
     () => photos.filter((photo) => photo.rating === 0).length,
     [photos],
   );
+  const ratingCounts = useMemo(() => {
+    const counts: Record<number, number> = {
+      0: 0,
+      1: 0,
+      2: 0,
+      3: 0,
+      4: 0,
+      5: 0,
+    };
+    for (const photo of photos) {
+      if (photo.rating === 0) {
+        counts[0] += 1;
+      } else if (photo.rating > 0 && photo.rating <= 5) {
+        counts[photo.rating] += 1;
+      }
+    }
+    return counts;
+  }, [photos]);
+  const isStarFilterDisabled = totalCount === 0;
   const displayedPhotos = useMemo(() => {
-    const filtered =
-      filterMode === "rated"
-        ? photos.filter((photo) => photo.rating > 0)
-        : filterMode === "unrated"
-          ? photos.filter((photo) => photo.rating === 0)
-          : photos;
+    const ratingFilterSet =
+      ratingFilter.length > 0 ? new Set(ratingFilter) : null;
+    const filtered = photos.filter((photo) =>
+      shouldIncludePhoto(photo, filterMode, ratingFilterSet),
+    );
 
     const sorted = [...filtered];
     sorted.sort((a, b) => {
@@ -170,7 +216,7 @@ export default function App() {
     });
 
     return sorted;
-  }, [filterMode, locale, photos, sortKey]);
+  }, [filterMode, locale, photos, ratingFilter, sortKey]);
   const displayedCount = displayedPhotos.length;
 
   const selectedPhoto = useMemo(
@@ -300,7 +346,10 @@ export default function App() {
 
   const handleRate = useCallback(
     (id: string, rating: number) => {
-      const isFilterActive = filterMode === "rated" || filterMode === "unrated";
+      const ratingFilterSet =
+        ratingFilter.length > 0 ? new Set(ratingFilter) : null;
+      const isFilterActive =
+        filterMode !== "all" || (ratingFilterSet?.size ?? 0) > 0;
       const currentFilteredIds = isFilterActive
         ? displayedPhotos.map((photo) => photo.id)
         : [];
@@ -320,7 +369,7 @@ export default function App() {
 
         if (isFilterActive) {
           const filteredPhotos = next.filter((photo) =>
-            filterMode === "rated" ? photo.rating > 0 : photo.rating === 0,
+            shouldIncludePhoto(photo, filterMode, ratingFilterSet),
           );
           if (
             selectedId &&
@@ -347,8 +396,12 @@ export default function App() {
         }
       });
     },
-    [displayedPhotos, filterMode, selectedId],
+    [displayedPhotos, filterMode, ratingFilter, selectedId],
   );
+
+  const handleRatingFilterChange = useCallback((next: number[]) => {
+    setRatingFilter(next);
+  }, []);
 
   const handleSelect = useCallback((id: string) => {
     setSelectedId(id);
@@ -1210,7 +1263,7 @@ export default function App() {
           style={previewLayoutStyle}
         >
           <section className="flex min-h-0 flex-col rounded-3xl bg-slate-900/80 px-0 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03),_0_25px_55px_rgba(0,0,0,0.30)]">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex flex-wrap items-center gap-3">
                 <div
                   className="flex items-center rounded-full border border-indigo-300/40 bg-indigo-500/10 p-1"
@@ -1300,6 +1353,17 @@ export default function App() {
                     {t("app.status.scanning")}
                   </span>
                 ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
+                <StarFilterMenu
+                  label={t("app.filter.stars.label")}
+                  noneLabel={t("app.filter.stars.none")}
+                  selectedRatings={ratingFilter}
+                  counts={ratingCounts}
+                  formatCount={formatNumber}
+                  onChange={handleRatingFilterChange}
+                  disabled={isStarFilterDisabled}
+                />
               </div>
             </div>
             <div className="mt-4 flex min-h-0 flex-1 rounded-2xl bg-slate-950/70">
