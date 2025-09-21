@@ -29,7 +29,7 @@ export default function PhotoPreview({
 }: PhotoPreviewProps) {
   const { t, formatDate } = useI18n();
   return (
-    <div className="flex min-h-0 flex-col rounded-3xl bg-[linear-gradient(175deg,_rgba(22,26,38,0.95),_rgba(12,14,24,0.92))] p-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.02),_0_20px_44px_rgba(0,0,0,0.32)]">
+    <div className="flex min-h-0 flex-col rounded-3xl w-full bg-[linear-gradient(175deg,_rgba(22,26,38,0.95),_rgba(12,14,24,0.92))] p-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.02),_0_20px_44px_rgba(0,0,0,0.32)]">
       <AnimatePresence mode="wait">
         {photo ? (
           <motion.div
