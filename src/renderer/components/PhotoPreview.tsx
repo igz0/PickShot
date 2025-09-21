@@ -28,6 +28,7 @@ export default function PhotoPreview({
   onExpand,
 }: PhotoPreviewProps) {
   const { t, formatDate } = useI18n();
+
   return (
     <div className="flex min-h-0 flex-col rounded-3xl w-full bg-[linear-gradient(175deg,_rgba(22,26,38,0.95),_rgba(12,14,24,0.92))] p-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.02),_0_20px_44px_rgba(0,0,0,0.32)]">
       <AnimatePresence mode="wait">
@@ -42,13 +43,13 @@ export default function PhotoPreview({
           >
             <button
               type="button"
-              className="flex flex-1 items-center justify-center overflow-hidden rounded-2xl border-none bg-slate-950/70 p-0 cursor-zoom-in focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+              className="relative flex w-full flex-none items-center justify-center overflow-hidden rounded-2xl border-none bg-slate-950/70 p-0 cursor-zoom-in focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 h-[65vh] max-h-[540px]"
               onClick={() => onExpand(photo)}
             >
               <img
                 src={photo.fileUrl}
                 alt={photo.name}
-                className="h-full w-full max-h-full object-contain"
+                className="h-full w-full object-cover transition-[object-position] duration-300"
               />
             </button>
             <div className="flex flex-col gap-3 px-3 py-5">
