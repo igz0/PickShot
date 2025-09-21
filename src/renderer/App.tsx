@@ -240,6 +240,10 @@ export default function App() {
     () => new Set(selectedIds),
     [selectedIds],
   );
+  const photoIdSet = useMemo(
+    () => new Set(photos.map((photo) => photo.id)),
+    [photos],
+  );
 
   const primarySelectedId = useMemo(() => {
     if (focusId && selectedIdSet.has(focusId)) {
@@ -391,10 +395,101 @@ export default function App() {
       });
   }, [directory]);
 
+  const computeSelectionAfterRating = useCallback(
+    (ids: string[], rating: number) => {
+      if (!ids.some((id) => selectedIds.includes(id))) {
+        return null;
+      }
+
+      const ratingFilterSet =
+        ratingFilter.length > 0 ? new Set(ratingFilter) : null;
+      const displayedIdSet = new Set(displayedPhotos.map((photo) => photo.id));
+      const hiddenIds = ids.filter((id) => {
+        const photo = photos.find((item) => item.id === id);
+        if (!photo) {
+          return false;
+        }
+        const updated = { ...photo, rating };
+        return !shouldIncludePhoto(updated, filterMode, ratingFilterSet);
+      });
+
+      if (hiddenIds.length === 0) {
+        return null;
+      }
+
+      const hiddenSet = new Set(hiddenIds);
+      const remainingSelected = selectedIds.filter(
+        (id) => !hiddenSet.has(id) && displayedIdSet.has(id),
+      );
+
+      const candidateIds = ids.filter((id) => selectedIds.includes(id));
+      const primaryAnchor =
+        (focusId && selectedIds.includes(focusId) ? focusId : null) ??
+        candidateIds[candidateIds.length - 1] ??
+        selectedIds[selectedIds.length - 1] ??
+        null;
+
+      let nextCandidate: RatedPhoto | null = null;
+      if (primaryAnchor) {
+        const anchorIndex = displayedPhotos.findIndex(
+          (photo) => photo.id === primaryAnchor,
+        );
+        if (anchorIndex !== -1) {
+          for (let index = anchorIndex + 1; index < displayedPhotos.length; index += 1) {
+            const candidate = displayedPhotos[index];
+            if (!hiddenSet.has(candidate.id)) {
+              nextCandidate = candidate;
+              break;
+            }
+          }
+          if (!nextCandidate) {
+            for (let index = anchorIndex - 1; index >= 0; index -= 1) {
+              const candidate = displayedPhotos[index];
+              if (!hiddenSet.has(candidate.id)) {
+                nextCandidate = candidate;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      let nextSelection = remainingSelected;
+      if (nextCandidate && !nextSelection.includes(nextCandidate.id)) {
+        nextSelection = [...nextSelection, nextCandidate.id];
+      }
+
+      if (!nextSelection.length && nextCandidate) {
+        nextSelection = [nextCandidate.id];
+      }
+
+      const nextFocus = nextSelection.length
+        ? nextCandidate && nextSelection.includes(nextCandidate.id)
+          ? nextCandidate.id
+          : nextSelection[nextSelection.length - 1]
+        : null;
+
+      return {
+        ids: nextSelection,
+        focus: nextFocus,
+      };
+    },
+    [
+      displayedPhotos,
+      filterMode,
+      focusId,
+      photos,
+      ratingFilter,
+      selectedIds,
+    ],
+  );
+
   const applyUniformRating = useCallback((ids: string[], rating: number) => {
     if (!ids.length) {
       return;
     }
+
+    const nextSelection = computeSelectionAfterRating(ids, rating);
 
     const targetIds = new Set(ids);
     setPhotos((prev) =>
@@ -415,7 +510,12 @@ export default function App() {
     ).catch((error) => {
       console.error("Failed to persist ratings", error);
     });
-  }, []);
+
+    if (nextSelection) {
+      setSelectedIds(nextSelection.ids);
+      setFocusId(nextSelection.focus);
+    }
+  }, [computeSelectionAfterRating]);
 
   const applyRelativeRating = useCallback(
     (targets: RatedPhoto[], delta: number) => {
@@ -972,6 +1072,18 @@ export default function App() {
     }
 
     if (filteredSelection.length === 0) {
+      const existingSelectedIds = selectedIds.filter((id) =>
+        photoIdSet.has(id),
+      );
+
+      if (existingSelectedIds.length > 0) {
+        setSelectedIds([]);
+        if (focusId !== null) {
+          setFocusId(null);
+        }
+        return;
+      }
+
       const fallbackId = displayedPhotos[0]?.id ?? null;
       if (fallbackId) {
         if (!arraysEqual(selectedIds, [fallbackId])) {
@@ -1001,7 +1113,7 @@ export default function App() {
     if (nextFocus !== focusId) {
       setFocusId(nextFocus);
     }
-  }, [displayedPhotos, focusId, selectedIds]);
+  }, [displayedPhotos, focusId, photoIdSet, selectedIds]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
