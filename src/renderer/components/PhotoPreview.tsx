@@ -25,10 +25,13 @@ function formatBytes(bytes: number): string {
 
 const STACK_TRANSFORMS = [
   "-rotate-[20deg] -translate-x-12 translate-y-8",
-  "-rotate-[6deg] -translate-x-5 translate-y-2",
-  "rotate-[6deg] translate-x-5 -translate-y-2",
+  "-rotate-[10deg] -translate-x-6 translate-y-4",
+  "rotate-0 translate-y-0",
+  "rotate-[10deg] translate-x-6 -translate-y-3",
   "rotate-[20deg] translate-x-12 translate-y-6",
 ] as const;
+const STACK_DISPLAY_COUNT = STACK_TRANSFORMS.length;
+const LIST_DISPLAY_COUNT = 5;
 
 export default function PhotoPreview({
   photos,
@@ -130,7 +133,7 @@ export default function PhotoPreview({
             >
               <div className="relative flex h-full w-full items-center justify-center">
                 {photos
-                  .slice(0, STACK_TRANSFORMS.length)
+                  .slice(-STACK_DISPLAY_COUNT)
                   .map((photo, index) => (
                     <img
                       key={photo.id}
@@ -140,9 +143,9 @@ export default function PhotoPreview({
                       style={{ zIndex: index + 1 }}
                     />
                   ))}
-                {selectionCount > STACK_TRANSFORMS.length ? (
+                {selectionCount > STACK_DISPLAY_COUNT ? (
                   <div className="absolute bottom-4 right-4 rounded-full bg-slate-950/80 px-4 py-1 text-xs font-semibold text-indigo-100 shadow-lg">
-                    +{formatNumber(selectionCount - STACK_TRANSFORMS.length)}
+                    +{formatNumber(selectionCount - STACK_DISPLAY_COUNT)}
                   </div>
                 ) : null}
               </div>
@@ -175,15 +178,15 @@ export default function PhotoPreview({
               </div>
               <div className="max-h-28 overflow-auto rounded-xl bg-slate-900/60 p-3 text-xs text-indigo-200/80">
                 <ul className="space-y-1">
-                  {photos.slice(0, 6).map((photo) => (
+                  {photos.slice(-LIST_DISPLAY_COUNT).map((photo) => (
                     <li key={photo.id} className="truncate">
                       {photo.name}
                     </li>
                   ))}
-                  {selectionCount > 6 ? (
+                  {selectionCount > LIST_DISPLAY_COUNT ? (
                     <li className="truncate text-indigo-300/80">
                       {t("photoPreview.multiMore", {
-                        count: formatNumber(selectionCount - 6),
+                        count: formatNumber(selectionCount - LIST_DISPLAY_COUNT),
                       })}
                     </li>
                   ) : null}
