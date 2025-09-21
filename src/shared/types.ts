@@ -45,6 +45,11 @@ export interface RevealPhotoResult {
   message?: string;
 }
 
+export interface OpenDirectoryResult {
+  success: boolean;
+  message?: string;
+}
+
 export interface RenamePhotoPayload {
   filePath: string;
   newName: string;

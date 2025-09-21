@@ -16,6 +16,7 @@ const intlLocaleMap: Record<Locale, string> = {
 const en = {
   "app.actions.clearFolder": "Close folder",
   "app.actions.loadFolder": "Load Folder",
+  "app.actions.openFolder": "Open folder",
   "app.confirm.delete": "Move “{{name}}” to Trash?",
   "app.context.delete": "Delete",
   "app.context.rename": "Rename",
@@ -109,6 +110,7 @@ const en = {
 const ja: typeof en = {
   "app.actions.clearFolder": "フォルダーを閉じる",
   "app.actions.loadFolder": "フォルダーを読み込み",
+  "app.actions.openFolder": "フォルダーを開く",
   "app.confirm.delete": "「{{name}}」をゴミ箱に移動します。よろしいですか？",
   "app.context.delete": "削除",
   "app.context.rename": "ファイル名を変更",

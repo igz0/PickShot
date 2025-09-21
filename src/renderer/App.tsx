@@ -201,10 +201,10 @@ export default function App() {
           prev.map((photo) =>
             photo.id === id
               ? {
-                  ...photo,
-                  thumbnailUrl,
-                  thumbnailRetinaUrl,
-                }
+                ...photo,
+                thumbnailUrl,
+                thumbnailRetinaUrl,
+              }
               : photo,
           ),
         );
@@ -286,6 +286,17 @@ export default function App() {
     setIsDragOverDropZone(false);
     dragDepthRef.current = 0;
   }, []);
+
+  const handleOpenDirectory = useCallback(() => {
+    if (!directory) {
+      return;
+    }
+    void window.api
+      .openDirectory(directory.path)
+      .catch((error) => {
+        console.error("Failed to open directory", error);
+      });
+  }, [directory]);
 
   const handleRate = useCallback(
     (id: string, rating: number) => {
@@ -376,7 +387,7 @@ export default function App() {
           currentIndex === -1
             ? fallbackIndex
             : (currentIndex + offset + displayedPhotos.length) %
-              displayedPhotos.length;
+            displayedPhotos.length;
         return displayedPhotos[index]?.id ?? null;
       });
     },
@@ -644,9 +655,9 @@ export default function App() {
         prev.map((item) =>
           item.id === renameTarget.id
             ? {
-                ...item,
-                ...result.photo,
-              }
+              ...item,
+              ...result.photo,
+            }
             : item,
         ),
       );
@@ -952,8 +963,8 @@ export default function App() {
 
   const previewLayoutStyle = isDesktopLayout
     ? ({ "--preview-width": `${previewPanelWidth}px` } as CSSProperties & {
-        "--preview-width"?: string;
-      })
+      "--preview-width"?: string;
+    })
     : undefined;
 
   const handlePreviewResizeStart = useCallback(
@@ -1150,9 +1161,15 @@ export default function App() {
                 className="inline-flex items-center gap-2 rounded-full bg-indigo-400/20 px-3 py-1 text-xs text-indigo-100"
                 title={directory.path}
               >
-                <span className="font-semibold text-indigo-50">
+                <button
+                  type="button"
+                  onClick={handleOpenDirectory}
+                  className="rounded-sm bg-transparent p-0 font-semibold text-indigo-50 decoration-indigo-200/60 transition-colors hover:underline hover:text-indigo-50/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-200"
+                  title={`${t("app.actions.openFolder")}: ${directory.path}`}
+                  aria-label={`${t("app.actions.openFolder")}: ${directory.label}`}
+                >
                   {directory.label}
-                </span>
+                </button>
                 <span className="text-indigo-200/80">
                   {formatPhotoCount(directory.count)}
                 </span>
@@ -1199,11 +1216,10 @@ export default function App() {
                   <button
                     type="button"
                     aria-pressed={filterMode === "all"}
-                    className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
-                      filterMode === "all"
-                        ? "bg-gradient-to-r from-sky-400 to-indigo-400 text-slate-900 shadow-[0_8px_18px_rgba(109,161,255,0.35)]"
-                        : "text-indigo-100 hover:bg-indigo-400/20"
-                    }`}
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${filterMode === "all"
+                      ? "bg-gradient-to-r from-sky-400 to-indigo-400 text-slate-900 shadow-[0_8px_18px_rgba(109,161,255,0.35)]"
+                      : "text-indigo-100 hover:bg-indigo-400/20"
+                      }`}
                     onClick={() => setFilterMode("all")}
                   >
                     {t("app.filter.all", {
@@ -1213,11 +1229,10 @@ export default function App() {
                   <button
                     type="button"
                     aria-pressed={filterMode === "rated"}
-                    className={`rounded-full px-4 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                      filterMode === "rated"
-                        ? "bg-gradient-to-r from-sky-400 to-indigo-400 text-slate-900 shadow-[0_8px_18px_rgba(109,161,255,0.35)]"
-                        : "text-indigo-100 hover:bg-indigo-400/20"
-                    }`}
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${filterMode === "rated"
+                      ? "bg-gradient-to-r from-sky-400 to-indigo-400 text-slate-900 shadow-[0_8px_18px_rgba(109,161,255,0.35)]"
+                      : "text-indigo-100 hover:bg-indigo-400/20"
+                      }`}
                     onClick={() => setFilterMode("rated")}
                     disabled={ratedCount === 0}
                     title={
@@ -1233,11 +1248,10 @@ export default function App() {
                   <button
                     type="button"
                     aria-pressed={filterMode === "unrated"}
-                    className={`rounded-full px-4 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                      filterMode === "unrated"
-                        ? "bg-gradient-to-r from-sky-400 to-indigo-400 text-slate-900 shadow-[0_8px_18px_rgba(109,161,255,0.35)]"
-                        : "text-indigo-100 hover:bg-indigo-400/20"
-                    }`}
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${filterMode === "unrated"
+                      ? "bg-gradient-to-r from-sky-400 to-indigo-400 text-slate-900 shadow-[0_8px_18px_rgba(109,161,255,0.35)]"
+                      : "text-indigo-100 hover:bg-indigo-400/20"
+                      }`}
                     onClick={() => setFilterMode("unrated")}
                     disabled={unratedCount === 0}
                     title={
@@ -1312,11 +1326,10 @@ export default function App() {
                     tabIndex={0}
                     aria-orientation="vertical"
                     aria-label={t("app.preview.resizeHandle")}
-                    className={`mx-auto h-full w-px rounded-full border-none m-0 transition-colors ${
-                      isResizingPreview
-                        ? "bg-sky-400/70"
-                        : "bg-slate-700/70 group-hover:bg-sky-300/60"
-                    }`}
+                    className={`mx-auto h-full w-px rounded-full border-none m-0 transition-colors ${isResizingPreview
+                      ? "bg-sky-400/70"
+                      : "bg-slate-700/70 group-hover:bg-sky-300/60"
+                      }`}
                   />
                 </div>
                 <div className="flex min-h-0 flex-1">

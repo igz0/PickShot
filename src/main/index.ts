@@ -19,6 +19,7 @@ import type {
   RatingUpdateResult,
   RenamePhotoPayload,
   RenamePhotoResult,
+  OpenDirectoryResult,
   RevealPhotoResult,
 } from "@shared/types";
 import {
@@ -843,6 +844,48 @@ app.whenReady().then(async () => {
         return { success: true };
       } catch (error) {
         console.error("Failed to reveal photo in folder", filePath, error);
+        return {
+          success: false,
+          message:
+            error instanceof Error
+              ? error.message
+              : translate(currentLocale, "app.error.unknown"),
+        };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    "directories:open",
+    async (
+      _event,
+      directoryPath: string,
+    ): Promise<OpenDirectoryResult> => {
+      try {
+        if (!existsSync(directoryPath)) {
+          return {
+            success: false,
+            message: translate(currentLocale, "app.error.revealNotFound"),
+          };
+        }
+
+        const info = await stat(directoryPath);
+        if (!info.isDirectory()) {
+          shell.showItemInFolder(directoryPath);
+          return { success: true };
+        }
+
+        const result = await shell.openPath(directoryPath);
+        if (typeof result === "string" && result.length > 0) {
+          return {
+            success: false,
+            message: result,
+          };
+        }
+
+        return { success: true };
+      } catch (error) {
+        console.error("Failed to open directory", directoryPath, error);
         return {
           success: false,
           message:

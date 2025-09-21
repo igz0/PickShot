@@ -3,6 +3,7 @@ import type {
   DeletePhotoResult,
   PhotoCollectionPayload,
   PhotoMeta,
+  OpenDirectoryResult,
   RatingUpdatePayload,
   RatingUpdateResult,
   RatingsSyncPayload,
@@ -25,6 +26,9 @@ const api = {
   },
   revealPhoto(filePath: string): Promise<RevealPhotoResult> {
     return ipcRenderer.invoke("photos:reveal", filePath);
+  },
+  openDirectory(directoryPath: string): Promise<OpenDirectoryResult> {
+    return ipcRenderer.invoke("directories:open", directoryPath);
   },
   renamePhoto(payload: RenamePhotoPayload): Promise<RenamePhotoResult> {
     return ipcRenderer.invoke("photos:rename", payload);
@@ -75,6 +79,7 @@ export type {
   PhotoMeta,
   PhotoCollectionPayload,
   RevealPhotoResult,
+  OpenDirectoryResult,
   RenamePhotoPayload,
   RenamePhotoResult,
   RatingUpdatePayload,
