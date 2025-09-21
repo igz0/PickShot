@@ -22,7 +22,12 @@ const en = {
   "app.dialog.preview": "Photo preview",
   "app.directory.count": "{{count}} photos",
   "app.directory.countSingular": "{{count}} photo",
-  "app.empty.default": "Load a folder to start browsing photos.",
+  "app.dnd.prompt": "Drop a folder to load photos.",
+  "app.dnd.unsupported": "Only folders can be dropped here.",
+  "app.dnd.emptyTitle": "Drag in a folder",
+  "app.dnd.emptyDescription":
+    "Drop a folder onto the grid to load its images instantly.",
+  "app.empty.default": "Drag & drop a folder to browse its images.",
   "app.empty.rated":
     "No rated photos yet. Once you add ratings they will appear here.",
   "app.empty.unrated":
@@ -109,7 +114,12 @@ const ja: typeof en = {
   "app.dialog.preview": "画像プレビュー",
   "app.directory.count": "{{count}} 枚",
   "app.directory.countSingular": "{{count}} 枚",
-  "app.empty.default": "フォルダを読み込むと写真が表示されます。",
+  "app.dnd.prompt": "ここにフォルダをドロップして読み込みます。",
+  "app.dnd.unsupported": "ドロップできるのはフォルダのみです。",
+  "app.dnd.emptyTitle": "フォルダをドラッグ",
+  "app.dnd.emptyDescription":
+    "フォルダを画像一覧にドロップすると、その中の画像が読み込まれます。",
+  "app.empty.default": "フォルダをここにドラッグ＆ドロップすると画像が読み込まれます。",
   "app.empty.rated":
     "星評価が付いた画像が見つかりません。評価を付けるとここに表示されます。",
   "app.empty.unrated":

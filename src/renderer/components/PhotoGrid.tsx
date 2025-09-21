@@ -1,4 +1,6 @@
+import { AnimatePresence, motion } from "framer-motion";
 import { memo, useMemo } from "react";
+import type { DragEvent as ReactDragEvent, ReactNode } from "react";
 import AutoSizer from "react-virtualized-auto-sizer";
 import { FixedSizeGrid, type GridChildComponentProps } from "react-window";
 import { useI18n } from "../i18n/I18nProvider";
@@ -15,7 +17,12 @@ interface PhotoGridProps {
     position: { x: number; y: number },
   ) => void;
   onExpand: (photo: RatedPhoto) => void;
-  emptyMessage?: string;
+  emptyContent?: ReactNode;
+  isDragOver?: boolean;
+  onDragEnter?: (event: ReactDragEvent<HTMLDivElement>) => void;
+  onDragOver?: (event: ReactDragEvent<HTMLDivElement>) => void;
+  onDragLeave?: (event: ReactDragEvent<HTMLDivElement>) => void;
+  onDrop?: (event: ReactDragEvent<HTMLDivElement>) => void;
 }
 
 const CELL_HEIGHT = 240;
@@ -89,14 +96,19 @@ export default function PhotoGrid({
   onRate,
   onContextMenu,
   onExpand,
-  emptyMessage,
+  emptyContent,
+  isDragOver,
+  onDragEnter,
+  onDragLeave,
+  onDragOver,
+  onDrop,
 }: PhotoGridProps) {
   const { t } = useI18n();
   const content = useMemo(() => {
     if (!photos.length) {
       return (
         <div className="flex h-full items-center justify-center text-sm text-slate-500">
-          {emptyMessage ?? t("photoGrid.empty")}
+          {emptyContent ?? t("photoGrid.empty")}
         </div>
       );
     }
@@ -133,7 +145,7 @@ export default function PhotoGrid({
       </AutoSizer>
     );
   }, [
-    emptyMessage,
+    emptyContent,
     onContextMenu,
     onExpand,
     onRate,
@@ -143,5 +155,44 @@ export default function PhotoGrid({
     t,
   ]);
 
-  return <div className="h-full w-full">{content}</div>;
+  return (
+    <div
+      className="relative h-full w-full"
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      <AnimatePresence>
+        {isDragOver ? (
+          <motion.div
+            key="grid-drop-overlay"
+            className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-2xl border-2 border-dashed border-sky-400/70 bg-[rgba(9,17,30,0.78)] backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="flex flex-col items-center gap-3 text-center text-sm font-semibold text-sky-100">
+              <svg
+                aria-hidden="true"
+                className="h-12 w-12 text-sky-300"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M3 7.5V6a1.5 1.5 0 0 1 1.5-1.5H9l2 2h8.5A1.5 1.5 0 0 1 21 8v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z" />
+                <path d="M12 16.5V11" />
+                <path d="M9.75 12.75 12 10.5 14.25 12.75" />
+              </svg>
+              <span>{t("app.dnd.prompt")}</span>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+      <div className="h-full w-full">{content}</div>
+    </div>
+  );
 }

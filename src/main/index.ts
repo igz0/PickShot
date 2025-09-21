@@ -493,6 +493,64 @@ async function collectPhotos(root: string): Promise<PhotoMeta[]> {
   return items;
 }
 
+async function loadPhotoCollectionFromDirectory(
+  directory: string,
+): Promise<PhotoCollectionPayload> {
+  if (!directory) {
+    return {
+      directory: null,
+      photos: [],
+      ratings: {},
+    };
+  }
+
+  try {
+    const stats = await stat(directory);
+    if (!stats.isDirectory()) {
+      return {
+        directory: null,
+        photos: [],
+        ratings: {},
+      };
+    }
+  } catch (error) {
+    return {
+      directory: null,
+      photos: [],
+      ratings: {},
+    };
+  }
+
+  const photos = await collectPhotos(directory);
+
+  const cachedRatings: Record<string, RatingCacheEntry> = getAllRatings();
+  const ratings: Record<string, number> = {};
+  const needsRefresh: PhotoMeta[] = [];
+
+  for (const photo of photos) {
+    const cached = cachedRatings[photo.id];
+    if (
+      cached &&
+      typeof cached.sourceModifiedAt === "number" &&
+      cached.sourceModifiedAt === photo.modifiedAt
+    ) {
+      if (cached.rating > 0) {
+        ratings[photo.id] = cached.rating;
+      }
+      continue;
+    }
+
+    if (cached && cached.rating > 0) {
+      ratings[photo.id] = cached.rating;
+    }
+    needsRefresh.push(photo);
+  }
+
+  void refreshRatingsInBackground(needsRefresh, cachedRatings);
+
+  return { directory, photos, ratings };
+}
+
 async function refreshRatingsInBackground(
   photos: PhotoMeta[],
   cachedRatings: Record<string, RatingCacheEntry>,
@@ -618,40 +676,27 @@ app.whenReady().then(async () => {
       if (result.canceled || !result.filePaths.length) {
         return {
           directory: null,
-          photos: [] as PhotoMeta[],
+          photos: [],
           ratings: {},
         };
       }
 
-      const directory = result.filePaths[0];
-      const photos = await collectPhotos(directory);
+      return loadPhotoCollectionFromDirectory(result.filePaths[0]);
+    },
+  );
 
-      const cachedRatings: Record<string, RatingCacheEntry> = getAllRatings();
-      const ratings: Record<string, number> = {};
-      const needsRefresh: PhotoMeta[] = [];
-
-      for (const photo of photos) {
-        const cached = cachedRatings[photo.id];
-        if (
-          cached &&
-          typeof cached.sourceModifiedAt === "number" &&
-          cached.sourceModifiedAt === photo.modifiedAt
-        ) {
-          if (cached.rating > 0) {
-            ratings[photo.id] = cached.rating;
-          }
-          continue;
-        }
-
-        if (cached && cached.rating > 0) {
-          ratings[photo.id] = cached.rating;
-        }
-        needsRefresh.push(photo);
+  ipcMain.handle(
+    "photos:load-folder",
+    async (_event, directoryPath: unknown): Promise<PhotoCollectionPayload> => {
+      if (typeof directoryPath !== "string") {
+        return {
+          directory: null,
+          photos: [],
+          ratings: {},
+        };
       }
 
-      void refreshRatingsInBackground(needsRefresh, cachedRatings);
-
-      return { directory, photos, ratings };
+      return loadPhotoCollectionFromDirectory(directoryPath);
     },
   );
 

@@ -1,7 +1,15 @@
-import type { DeletePhotoResult, PhotoMeta } from "@preload/index";
+import type {
+  DeletePhotoResult,
+  PhotoCollectionPayload,
+  PhotoMeta,
+} from "@preload/index";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import type {
+  CSSProperties,
+  DragEvent as ReactDragEvent,
+  PointerEvent as ReactPointerEvent,
+} from "react";
 import PhotoContextMenu from "./components/PhotoContextMenu";
 import PhotoGrid from "./components/PhotoGrid";
 import PhotoPreview from "./components/PhotoPreview";
@@ -50,6 +58,29 @@ const MIN_PREVIEW_WIDTH = 260;
 const MAX_PREVIEW_WIDTH = 720;
 const MIN_GRID_WIDTH = 360;
 
+interface WebkitFileSystemEntry {
+  isFile: boolean;
+  isDirectory: boolean;
+}
+
+interface DataTransferItemWithEntry extends DataTransferItem {
+  webkitGetAsEntry?: () => WebkitFileSystemEntry | null;
+}
+
+type FileWithPath = File & { path?: string };
+
+function hasFileItems(items: DataTransferItemList | null): boolean {
+  if (!items) {
+    return false;
+  }
+  for (let index = 0; index < items.length; index += 1) {
+    if (items[index]?.kind === "file") {
+      return true;
+    }
+  }
+  return false;
+}
+
 function clampPreviewWidth(width: number, containerWidth: number): number {
   if (!Number.isFinite(containerWidth) || containerWidth <= 0) {
     return Math.min(Math.max(width, MIN_PREVIEW_WIDTH), MAX_PREVIEW_WIDTH);
@@ -81,6 +112,7 @@ export default function App() {
     DEFAULT_PREVIEW_WIDTH,
   );
   const [isResizingPreview, setIsResizingPreview] = useState(false);
+  const [isDragOverDropZone, setIsDragOverDropZone] = useState(false);
   const [isDesktopLayout, setIsDesktopLayout] = useState<boolean>(() => {
     if (typeof window === "undefined") {
       return false;
@@ -92,6 +124,7 @@ export default function App() {
     startX: 0,
     startWidth: DEFAULT_PREVIEW_WIDTH,
   });
+  const dragDepthRef = useRef(0);
 
   const totalCount = photos.length;
   const ratedCount = useMemo(
@@ -209,11 +242,8 @@ export default function App() {
     [],
   );
 
-  const handleLoad = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const payload = await window.api.selectFolder();
-
+  const applyCollection = useCallback(
+    (payload: PhotoCollectionPayload) => {
       if (!payload.directory) {
         return;
       }
@@ -224,14 +254,22 @@ export default function App() {
 
       mergePhotos(payload.photos, payload.ratings);
       updateDirectory(payload.directory, payload.photos.length);
-
       setSelectedId(payload.photos[0]?.id ?? null);
+    },
+    [mergePhotos, updateDirectory],
+  );
+
+  const handleLoad = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const payload = await window.api.selectFolder();
+      applyCollection(payload);
     } catch (error) {
       console.error(error);
     } finally {
       setIsLoading(false);
     }
-  }, [mergePhotos, updateDirectory]);
+  }, [applyCollection]);
 
   const handleRate = useCallback(
     (id: string, rating: number) => {
@@ -326,7 +364,7 @@ export default function App() {
         return displayedPhotos[index]?.id ?? null;
       });
     },
-    [displayedPhotos, t],
+    [displayedPhotos],
   );
 
   const selectEdge = useCallback(
@@ -340,6 +378,51 @@ export default function App() {
     },
     [displayedPhotos],
   );
+
+  const emptyGridContent = useMemo(() => {
+    if (filterMode === "rated") {
+      return (
+        <p className="max-w-xs text-center text-sm text-indigo-200/80">
+          {t("app.empty.rated")}
+        </p>
+      );
+    }
+    if (filterMode === "unrated") {
+      return (
+        <p className="max-w-xs text-center text-sm text-indigo-200/80">
+          {t("app.empty.unrated")}
+        </p>
+      );
+    }
+    return (
+      <div className="flex flex-col items-center gap-4 text-center text-indigo-100">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/10 text-sky-300">
+          <svg
+            aria-hidden="true"
+            className="h-9 w-9"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M3 7.5V6a1.5 1.5 0 0 1 1.5-1.5H9l2 2h8.5A1.5 1.5 0 0 1 21 8v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z" />
+            <path d="M12 16.5V11" />
+            <path d="M9.75 12.75 12 10.5 14.25 12.75" />
+          </svg>
+        </div>
+        <div className="space-y-1">
+          <p className="text-base font-semibold text-indigo-50">
+            {t("app.dnd.emptyTitle")}
+          </p>
+          <p className="max-w-xs text-sm text-indigo-200/80">
+            {t("app.dnd.emptyDescription")}
+          </p>
+        </div>
+      </div>
+    );
+  }, [filterMode, t]);
 
   const toggleFilter = useCallback(() => {
     setFilterMode((prev) => {
@@ -456,7 +539,7 @@ export default function App() {
         current === photo.id ? (nextSelectionId ?? null) : current,
       );
     },
-    [displayedPhotos],
+    [displayedPhotos, t],
   );
 
   const handleReveal = useCallback(
@@ -873,6 +956,120 @@ export default function App() {
     [isDesktopLayout, previewPanelWidth],
   );
 
+  const handleDragEnter = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
+      if (!hasFileItems(event.dataTransfer?.items ?? null)) {
+        return;
+      }
+      event.preventDefault();
+      dragDepthRef.current += 1;
+      setIsDragOverDropZone(true);
+    },
+    [],
+  );
+
+  const handleDragOver = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
+      if (!hasFileItems(event.dataTransfer?.items ?? null)) {
+        return;
+      }
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+      if (!isDragOverDropZone) {
+        setIsDragOverDropZone(true);
+      }
+    },
+    [isDragOverDropZone],
+  );
+
+  const handleDragLeave = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
+      const containsFiles = hasFileItems(event.dataTransfer?.items ?? null);
+      if (!containsFiles && event.relatedTarget) {
+        return;
+      }
+      event.preventDefault();
+      if (containsFiles) {
+        dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+      } else {
+        dragDepthRef.current = 0;
+      }
+      if (dragDepthRef.current === 0) {
+        setIsDragOverDropZone(false);
+      }
+    },
+    [],
+  );
+
+  const handleDrop = useCallback(
+    async (event: ReactDragEvent<HTMLDivElement>) => {
+      if (!hasFileItems(event.dataTransfer?.items ?? null)) {
+        return;
+      }
+      event.preventDefault();
+      dragDepthRef.current = 0;
+      setIsDragOverDropZone(false);
+      if (isLoading) {
+        return;
+      }
+
+      const files = Array.from(event.dataTransfer?.files ?? []) as FileWithPath[];
+      const items = Array.from(
+        event.dataTransfer?.items ?? [],
+      ) as DataTransferItemWithEntry[];
+      if (!files.length) {
+        return;
+      }
+
+      const directoriesFromEntries = items
+        .map((item, index) => {
+          const entry = item?.webkitGetAsEntry?.();
+          if (entry?.isDirectory) {
+            const file = files[index];
+            return file?.path;
+          }
+          return null;
+        })
+        .filter((entry): entry is string => Boolean(entry));
+
+      const candidates = (directoriesFromEntries.length > 0
+        ? directoriesFromEntries
+        : files.map((file) => file.path)
+      )
+        .filter((entry): entry is string => Boolean(entry));
+
+      if (!candidates.length) {
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        let handled = false;
+        let sawDirectory = directoriesFromEntries.length > 0;
+        for (const candidate of candidates) {
+          const payload = await window.api.loadFolder(candidate);
+          if (payload.directory) {
+            sawDirectory = true;
+            if (payload.photos.length > 0) {
+              applyCollection(payload);
+              handled = true;
+              break;
+            }
+          }
+        }
+
+        if (!handled && !sawDirectory) {
+          window.alert(t("app.dnd.unsupported"));
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [applyCollection, isLoading, t],
+  );
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(24,29,36,0.92),_#05070a_68%)] font-sans text-slate-100">
       <div className="flex min-h-screen flex-col gap-5 px-5 py-6">
@@ -1057,13 +1254,12 @@ export default function App() {
                 onRate={handleRate}
                 onContextMenu={handleContextMenuRequest}
                 onExpand={handleExpand}
-                emptyMessage={
-                  filterMode === "rated"
-                    ? t("app.empty.rated")
-                    : filterMode === "unrated"
-                      ? t("app.empty.unrated")
-                      : t("app.empty.default")
-                }
+                emptyContent={emptyGridContent}
+                isDragOver={isDragOverDropZone}
+                onDragEnter={handleDragEnter}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
               />
             </div>
           </section>

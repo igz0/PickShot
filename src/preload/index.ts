@@ -17,6 +17,9 @@ const api = {
   selectFolder(): Promise<PhotoCollectionPayload> {
     return ipcRenderer.invoke("photos:select-folder");
   },
+  loadFolder(directoryPath: string): Promise<PhotoCollectionPayload> {
+    return ipcRenderer.invoke("photos:load-folder", directoryPath);
+  },
   deletePhoto(filePath: string): Promise<DeletePhotoResult> {
     return ipcRenderer.invoke("photos:delete", filePath);
   },

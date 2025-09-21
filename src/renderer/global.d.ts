@@ -15,6 +15,7 @@ declare global {
   interface Window {
     api: {
       selectFolder(): Promise<PhotoCollectionPayload>;
+      loadFolder(directoryPath: string): Promise<PhotoCollectionPayload>;
       deletePhoto(filePath: string): Promise<DeletePhotoResult>;
       revealPhoto(filePath: string): Promise<RevealPhotoResult>;
       renamePhoto(payload: RenamePhotoPayload): Promise<RenamePhotoResult>;
