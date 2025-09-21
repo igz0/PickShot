@@ -1703,11 +1703,6 @@ export default function App() {
                     <option value="ratingAsc">{t("app.sort.ratingAsc")}</option>
                   </select>
                 </div>
-                {isLoading ? (
-                  <span className="inline-flex items-center rounded-full bg-sky-300/20 px-3 py-1 text-[11px] uppercase tracking-wide text-sky-200">
-                    {t("app.status.scanning")}
-                  </span>
-                ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
                 <StarFilterMenu

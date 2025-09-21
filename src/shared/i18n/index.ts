@@ -92,7 +92,6 @@ const en = {
   "app.sort.nameDesc": "Name (Z → A)",
   "app.sort.ratingAsc": "Rating (low to high)",
   "app.sort.ratingDesc": "Rating (high to low)",
-  "app.status.scanning": "Scanning…",
   "app.tooltips.shortcuts": "Keyboard shortcuts (Shift + ?)",
   "main.sqliteError.message":
     "The better-sqlite3 native module is not available for this Electron build.\nReinstall dependencies and run `npm run rebuild-native`, then restart the app.",
@@ -197,7 +196,6 @@ const ja: typeof en = {
   "app.sort.nameDesc": "名前 (降順)",
   "app.sort.ratingAsc": "評価 (低い順)",
   "app.sort.ratingDesc": "評価 (高い順)",
-  "app.status.scanning": "スキャン中…",
   "app.tooltips.shortcuts": "キーボードショートカット (Shift + ?)",
   "main.sqliteError.message":
     "better-sqlite3 のネイティブモジュールが現在の Electron で利用できません。\n依存関係を再インストール後、`npm run rebuild-native` を実行して再起動してください。",
