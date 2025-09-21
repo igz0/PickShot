@@ -15,6 +15,7 @@ import PhotoContextMenu from "./components/PhotoContextMenu";
 import PhotoGrid from "./components/PhotoGrid";
 import PhotoPreview from "./components/PhotoPreview";
 import RenamePhotoDialog from "./components/RenamePhotoDialog";
+import SortMenu from "./components/SortMenu";
 import StarFilterMenu from "./components/StarFilterMenu";
 import { useI18n } from "./i18n/I18nProvider";
 import type { RatedPhoto } from "./types";
@@ -164,6 +165,35 @@ export default function App() {
     return window.matchMedia("(min-width: 1024px)").matches;
   });
   const [ratingFilter, setRatingFilter] = useState<number[]>([]);
+  const sortOptions = useMemo<Array<{ value: SortKey; label: string }>>(
+    () => [
+      {
+        value: "modifiedDesc",
+        label: t("app.sort.modifiedDesc"),
+      },
+      {
+        value: "modifiedAsc",
+        label: t("app.sort.modifiedAsc"),
+      },
+      {
+        value: "nameAsc",
+        label: t("app.sort.nameAsc"),
+      },
+      {
+        value: "nameDesc",
+        label: t("app.sort.nameDesc"),
+      },
+      {
+        value: "ratingDesc",
+        label: t("app.sort.ratingDesc"),
+      },
+      {
+        value: "ratingAsc",
+        label: t("app.sort.ratingAsc"),
+      },
+    ],
+    [t],
+  );
   const layoutContainerRef = useRef<HTMLDivElement | null>(null);
   const resizeStateRef = useRef({
     startX: 0,
@@ -1677,32 +1707,13 @@ export default function App() {
                     })}
                   </button>
                 </div>
-                <div className="flex items-center gap-2 rounded-full border border-indigo-300/40 bg-indigo-500/10 px-3 py-1.5 text-xs text-indigo-100">
-                  <span className="font-semibold text-indigo-50">
-                    {t("app.sort.label")}
-                  </span>
-                  <select
-                    aria-label={t("app.sort.ariaLabel")}
-                    value={sortKey}
-                    onChange={(event) =>
-                      setSortKey(event.target.value as SortKey)
-                    }
-                    className="appearance-none rounded-full border border-indigo-300/60 bg-indigo-900/60 px-3 py-1 text-xs text-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
-                  >
-                    <option value="modifiedDesc">
-                      {t("app.sort.modifiedDesc")}
-                    </option>
-                    <option value="modifiedAsc">
-                      {t("app.sort.modifiedAsc")}
-                    </option>
-                    <option value="nameAsc">{t("app.sort.nameAsc")}</option>
-                    <option value="nameDesc">{t("app.sort.nameDesc")}</option>
-                    <option value="ratingDesc">
-                      {t("app.sort.ratingDesc")}
-                    </option>
-                    <option value="ratingAsc">{t("app.sort.ratingAsc")}</option>
-                  </select>
-                </div>
+                <SortMenu
+                  label={t("app.sort.label")}
+                  ariaLabel={t("app.sort.ariaLabel")}
+                  value={sortKey}
+                  options={sortOptions}
+                  onChange={(nextSortKey) => setSortKey(nextSortKey)}
+                />
               </div>
               <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
                 <StarFilterMenu
