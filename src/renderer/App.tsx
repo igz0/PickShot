@@ -179,14 +179,17 @@ export default function App() {
   );
 
   const mergePhotos = useCallback(
-    (incoming: PhotoMeta[], incomingRatings?: Record<string, number>) => {
-      setPhotos(() => {
-        const ratingMap = incomingRatings ?? {};
-        const next = incoming
-          .map((photo) => toRatedPhoto(photo, ratingMap))
-          .sort((a, b) => b.modifiedAt - a.modifiedAt);
-        return next;
-      });
+    (
+      incoming: PhotoMeta[],
+      incomingRatings?: Record<string, number>,
+    ): RatedPhoto[] => {
+      const ratingMap = incomingRatings ?? {};
+      const next = incoming
+        .map((photo) => toRatedPhoto(photo, ratingMap))
+        .sort((a, b) => b.modifiedAt - a.modifiedAt);
+
+      setPhotos(next);
+      return next;
     },
     [],
   );
@@ -252,9 +255,9 @@ export default function App() {
         return;
       }
 
-      mergePhotos(payload.photos, payload.ratings);
+      const nextPhotos = mergePhotos(payload.photos, payload.ratings);
       updateDirectory(payload.directory, payload.photos.length);
-      setSelectedId(payload.photos[0]?.id ?? null);
+      setSelectedId(nextPhotos[0]?.id ?? null);
     },
     [mergePhotos, updateDirectory],
   );
