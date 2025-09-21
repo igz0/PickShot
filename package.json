@@ -1,6 +1,6 @@
 {
   "name": "pickshot",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Electron + React desktop app for rapidly tagging favorite illustrations from large folders.",
   "author": "igz0",
   "license": "MIT",
@@ -52,10 +52,14 @@
     "directories": {
       "output": "release"
     },
-    "files": ["dist/**"],
+    "files": [
+      "dist/**"
+    ],
     "asar": true,
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "category": "public.app-category.photography",
       "identity": null,
       "hardenedRuntime": false,
@@ -69,7 +73,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
