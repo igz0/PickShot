@@ -1,10 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { memo, useMemo } from "react";
-import type {
-  DragEvent as ReactDragEvent,
-  MouseEvent,
-  ReactNode,
-} from "react";
+import type { MouseEvent, DragEvent as ReactDragEvent, ReactNode } from "react";
 import AutoSizer from "react-virtualized-auto-sizer";
 import { FixedSizeGrid, type GridChildComponentProps } from "react-window";
 import { useI18n } from "../i18n/I18nProvider";

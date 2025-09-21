@@ -136,7 +136,8 @@ const ja: typeof en = {
   "app.dnd.emptyTitle": "フォルダをドラッグ",
   "app.dnd.emptyDescription":
     "フォルダを画像一覧にドロップすると、その中の画像が読み込まれます。",
-  "app.empty.default": "フォルダをここにドラッグ＆ドロップすると画像が読み込まれます。",
+  "app.empty.default":
+    "フォルダをここにドラッグ＆ドロップすると画像が読み込まれます。",
   "app.empty.rated":
     "星評価が付いた画像が見つかりません。評価を付けるとここに表示されます。",
   "app.empty.unrated":

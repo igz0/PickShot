@@ -115,10 +115,11 @@ export default function SortMenu<Value extends string>({
                 type="button"
                 role="option"
                 aria-selected={isSelected}
-                className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-xs transition-colors ${isSelected
-                  ? "bg-indigo-500/25 text-indigo-50 hover:bg-indigo-500/25"
-                  : "text-indigo-100 hover:bg-indigo-500/10"
-                  }`}
+                className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-xs transition-colors ${
+                  isSelected
+                    ? "bg-indigo-500/25 text-indigo-50 hover:bg-indigo-500/25"
+                    : "text-indigo-100 hover:bg-indigo-500/10"
+                }`}
                 onClick={() => handleSelect(option.value)}
               >
                 <span className="font-medium">{option.label}</span>

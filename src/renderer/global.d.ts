@@ -1,5 +1,6 @@
 import type {
   DeletePhotoResult,
+  OpenDirectoryResult,
   PhotoCollectionPayload,
   RatingUpdatePayload,
   RatingUpdateResult,
@@ -7,7 +8,6 @@ import type {
   RenamePhotoPayload,
   RenamePhotoResult,
   RevealPhotoResult,
-  OpenDirectoryResult,
   ThumbnailReadyPayload,
 } from "@preload/index";
 import type { Locale } from "@shared/i18n";

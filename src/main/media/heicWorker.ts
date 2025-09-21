@@ -1,5 +1,5 @@
-import { parentPort } from "node:worker_threads";
 import { readFile, writeFile } from "node:fs/promises";
+import { parentPort } from "node:worker_threads";
 import heicConvert from "heic-convert";
 
 if (!parentPort) {
@@ -50,5 +50,5 @@ parentPort.on("message", async (payload: WorkerPayload) => {
     response.error = serializeError(error);
   }
 
-  parentPort!.postMessage(response);
+  parentPort?.postMessage(response);
 });

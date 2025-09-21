@@ -266,10 +266,7 @@ export default function App() {
   }, [filterMode, locale, photos, ratingFilter, sortKey]);
   const displayedCount = displayedPhotos.length;
 
-  const selectedIdSet = useMemo(
-    () => new Set(selectedIds),
-    [selectedIds],
-  );
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const photoIdSet = useMemo(
     () => new Set(photos.map((photo) => photo.id)),
     [photos],
@@ -292,7 +289,8 @@ export default function App() {
   const primarySelectedPhoto = useMemo(
     () =>
       primarySelectedId
-        ? displayedPhotos.find((photo) => photo.id === primarySelectedId) ?? null
+        ? (displayedPhotos.find((photo) => photo.id === primarySelectedId) ??
+          null)
         : null,
     [displayedPhotos, primarySelectedId],
   );
@@ -320,10 +318,10 @@ export default function App() {
           prev.map((photo) =>
             photo.id === id
               ? {
-                ...photo,
-                thumbnailUrl,
-                thumbnailRetinaUrl,
-              }
+                  ...photo,
+                  thumbnailUrl,
+                  thumbnailRetinaUrl,
+                }
               : photo,
           ),
         );
@@ -418,11 +416,9 @@ export default function App() {
     if (!directory) {
       return;
     }
-    void window.api
-      .openDirectory(directory.path)
-      .catch((error) => {
-        console.error("Failed to open directory", error);
-      });
+    void window.api.openDirectory(directory.path).catch((error) => {
+      console.error("Failed to open directory", error);
+    });
   }, [directory]);
 
   const computeSelectionAfterRating = useCallback(
@@ -465,7 +461,11 @@ export default function App() {
           (photo) => photo.id === primaryAnchor,
         );
         if (anchorIndex !== -1) {
-          for (let index = anchorIndex + 1; index < displayedPhotos.length; index += 1) {
+          for (
+            let index = anchorIndex + 1;
+            index < displayedPhotos.length;
+            index += 1
+          ) {
             const candidate = displayedPhotos[index];
             if (!hiddenSet.has(candidate.id)) {
               nextCandidate = candidate;
@@ -504,48 +504,44 @@ export default function App() {
         focus: nextFocus,
       };
     },
-    [
-      displayedPhotos,
-      filterMode,
-      focusId,
-      photos,
-      ratingFilter,
-      selectedIds,
-    ],
+    [displayedPhotos, filterMode, focusId, photos, ratingFilter, selectedIds],
   );
 
-  const applyUniformRating = useCallback((ids: string[], rating: number) => {
-    if (!ids.length) {
-      return;
-    }
+  const applyUniformRating = useCallback(
+    (ids: string[], rating: number) => {
+      if (!ids.length) {
+        return;
+      }
 
-    const nextSelection = computeSelectionAfterRating(ids, rating);
+      const nextSelection = computeSelectionAfterRating(ids, rating);
 
-    const targetIds = new Set(ids);
-    setPhotos((prev) =>
-      prev.map((photo) =>
-        targetIds.has(photo.id) ? { ...photo, rating } : photo,
-      ),
-    );
+      const targetIds = new Set(ids);
+      setPhotos((prev) =>
+        prev.map((photo) =>
+          targetIds.has(photo.id) ? { ...photo, rating } : photo,
+        ),
+      );
 
-    void Promise.all(
-      ids.map((id) =>
-        window.api.updateRating({ id, rating }).then((result) => {
-          if (!result.success && result.message) {
-            console.error("Failed to persist rating", result.message);
-          }
-          return result;
-        }),
-      ),
-    ).catch((error) => {
-      console.error("Failed to persist ratings", error);
-    });
+      void Promise.all(
+        ids.map((id) =>
+          window.api.updateRating({ id, rating }).then((result) => {
+            if (!result.success && result.message) {
+              console.error("Failed to persist rating", result.message);
+            }
+            return result;
+          }),
+        ),
+      ).catch((error) => {
+        console.error("Failed to persist ratings", error);
+      });
 
-    if (nextSelection) {
-      setSelectedIds(nextSelection.ids);
-      setFocusId(nextSelection.focus);
-    }
-  }, [computeSelectionAfterRating]);
+      if (nextSelection) {
+        setSelectedIds(nextSelection.ids);
+        setFocusId(nextSelection.focus);
+      }
+    },
+    [computeSelectionAfterRating],
+  );
 
   const applyRelativeRating = useCallback(
     (targets: RatedPhoto[], delta: number) => {
@@ -561,13 +557,17 @@ export default function App() {
           }
           return { id: photo.id, rating: nextRating };
         })
-        .filter((entry): entry is { id: string; rating: number } => Boolean(entry));
+        .filter((entry): entry is { id: string; rating: number } =>
+          Boolean(entry),
+        );
 
       if (!updates.length) {
         return;
       }
 
-      const updateMap = new Map(updates.map((entry) => [entry.id, entry.rating]));
+      const updateMap = new Map(
+        updates.map((entry) => [entry.id, entry.rating]),
+      );
       setPhotos((prev) =>
         prev.map((photo) =>
           updateMap.has(photo.id)
@@ -624,9 +624,7 @@ export default function App() {
           } else {
             const start = Math.min(anchorIndex, targetIndex);
             const end = Math.max(anchorIndex, targetIndex);
-            next = displayedPhotos
-              .slice(start, end + 1)
-              .map((item) => item.id);
+            next = displayedPhotos.slice(start, end + 1).map((item) => item.id);
           }
         } else if (isToggle) {
           if (current.includes(photo.id)) {
@@ -844,8 +842,8 @@ export default function App() {
         targets.length === 1
           ? t("app.confirm.delete", { name: targets[0].name })
           : t("app.confirm.deleteMany", {
-            count: formatNumber(targets.length),
-          });
+              count: formatNumber(targets.length),
+            });
 
       const confirmed = window.confirm(confirmationMessage);
       if (!confirmed) {
@@ -853,7 +851,10 @@ export default function App() {
       }
 
       const successfulIds: string[] = [];
-      const failed: Array<{ photo: RatedPhoto; result: DeletePhotoResult | null }> = [];
+      const failed: Array<{
+        photo: RatedPhoto;
+        result: DeletePhotoResult | null;
+      }> = [];
 
       for (const target of targets) {
         try {
@@ -873,8 +874,8 @@ export default function App() {
         const firstFailure = failed[0];
         const fallbackMessage = firstFailure?.result?.message
           ? t("app.error.deleteWithReason", {
-            reason: firstFailure.result.message,
-          })
+              reason: firstFailure.result.message,
+            })
           : t("app.error.deleteUnexpected");
         window.alert(fallbackMessage);
         return;
@@ -883,7 +884,9 @@ export default function App() {
       if (failed.length > 0) {
         const firstFailure = failed[0];
         const message = firstFailure?.result?.message
-          ? t("app.error.deleteWithReason", { reason: firstFailure.result.message })
+          ? t("app.error.deleteWithReason", {
+              reason: firstFailure.result.message,
+            })
           : t("app.error.deleteUnexpected");
         window.alert(message);
       }
@@ -902,8 +905,7 @@ export default function App() {
         }
         const removedCount = targets.filter(
           (photo) =>
-            successIdSet.has(photo.id) &&
-            photo.filePath.startsWith(prev.path),
+            successIdSet.has(photo.id) && photo.filePath.startsWith(prev.path),
         ).length;
         if (removedCount === 0) {
           return prev;
@@ -914,7 +916,9 @@ export default function App() {
         };
       });
 
-      setSelectedIds((current) => current.filter((id) => !successIdSet.has(id)));
+      setSelectedIds((current) =>
+        current.filter((id) => !successIdSet.has(id)),
+      );
       setFocusId((current) =>
         current && successIdSet.has(current) ? null : current,
       );
@@ -1038,9 +1042,9 @@ export default function App() {
         prev.map((item) =>
           item.id === renameTarget.id
             ? {
-              ...item,
-              ...result.photo,
-            }
+                ...item,
+                ...result.photo,
+              }
             : item,
         ),
       );
@@ -1139,7 +1143,7 @@ export default function App() {
     const nextFocus =
       focusId && displayedIdSet.has(focusId)
         ? focusId
-        : filteredSelection[filteredSelection.length - 1] ?? null;
+        : (filteredSelection[filteredSelection.length - 1] ?? null);
     if (nextFocus !== focusId) {
       setFocusId(nextFocus);
     }
@@ -1405,8 +1409,8 @@ export default function App() {
 
   const previewLayoutStyle = isDesktopLayout
     ? ({ "--preview-width": `${previewPanelWidth}px` } as CSSProperties & {
-      "--preview-width"?: string;
-    })
+        "--preview-width"?: string;
+      })
     : undefined;
 
   const handlePreviewResizeStart = useCallback(
@@ -1482,7 +1486,9 @@ export default function App() {
         return;
       }
 
-      const files = Array.from(event.dataTransfer?.files ?? []) as FileWithPath[];
+      const files = Array.from(
+        event.dataTransfer?.files ?? [],
+      ) as FileWithPath[];
       const items = Array.from(
         event.dataTransfer?.items ?? [],
       ) as DataTransferItemWithEntry[];
@@ -1501,11 +1507,11 @@ export default function App() {
         })
         .filter((entry): entry is string => Boolean(entry));
 
-      const candidates = (directoriesFromEntries.length > 0
-        ? directoriesFromEntries
-        : files.map((file) => file.path)
-      )
-        .filter((entry): entry is string => Boolean(entry));
+      const candidates = (
+        directoriesFromEntries.length > 0
+          ? directoriesFromEntries
+          : files.map((file) => file.path)
+      ).filter((entry): entry is string => Boolean(entry));
 
       if (!candidates.length) {
         return;
@@ -1658,10 +1664,11 @@ export default function App() {
                   <button
                     type="button"
                     aria-pressed={filterMode === "all"}
-                    className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${filterMode === "all"
-                      ? "bg-gradient-to-r from-sky-400 to-indigo-400 text-slate-900 shadow-[0_8px_18px_rgba(109,161,255,0.35)]"
-                      : "text-indigo-100 hover:bg-indigo-400/20"
-                      }`}
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
+                      filterMode === "all"
+                        ? "bg-gradient-to-r from-sky-400 to-indigo-400 text-slate-900 shadow-[0_8px_18px_rgba(109,161,255,0.35)]"
+                        : "text-indigo-100 hover:bg-indigo-400/20"
+                    }`}
                     onClick={() => setFilterMode("all")}
                   >
                     {t("app.filter.all", {
@@ -1671,10 +1678,11 @@ export default function App() {
                   <button
                     type="button"
                     aria-pressed={filterMode === "rated"}
-                    className={`rounded-full px-4 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${filterMode === "rated"
-                      ? "bg-gradient-to-r from-sky-400 to-indigo-400 text-slate-900 shadow-[0_8px_18px_rgba(109,161,255,0.35)]"
-                      : "text-indigo-100 hover:bg-indigo-400/20"
-                      }`}
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                      filterMode === "rated"
+                        ? "bg-gradient-to-r from-sky-400 to-indigo-400 text-slate-900 shadow-[0_8px_18px_rgba(109,161,255,0.35)]"
+                        : "text-indigo-100 hover:bg-indigo-400/20"
+                    }`}
                     onClick={() => setFilterMode("rated")}
                     disabled={ratedCount === 0}
                     title={
@@ -1690,10 +1698,11 @@ export default function App() {
                   <button
                     type="button"
                     aria-pressed={filterMode === "unrated"}
-                    className={`rounded-full px-4 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${filterMode === "unrated"
-                      ? "bg-gradient-to-r from-sky-400 to-indigo-400 text-slate-900 shadow-[0_8px_18px_rgba(109,161,255,0.35)]"
-                      : "text-indigo-100 hover:bg-indigo-400/20"
-                      }`}
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                      filterMode === "unrated"
+                        ? "bg-gradient-to-r from-sky-400 to-indigo-400 text-slate-900 shadow-[0_8px_18px_rgba(109,161,255,0.35)]"
+                        : "text-indigo-100 hover:bg-indigo-400/20"
+                    }`}
                     onClick={() => setFilterMode("unrated")}
                     disabled={unratedCount === 0}
                     title={
@@ -1755,10 +1764,11 @@ export default function App() {
                     tabIndex={0}
                     aria-orientation="vertical"
                     aria-label={t("app.preview.resizeHandle")}
-                    className={`mx-auto h-full w-px rounded-full border-none m-0 transition-colors ${isResizingPreview
-                      ? "bg-sky-400/70"
-                      : "bg-slate-700/70 group-hover:bg-sky-300/60"
-                      }`}
+                    className={`mx-auto h-full w-px rounded-full border-none m-0 transition-colors ${
+                      isResizingPreview
+                        ? "bg-sky-400/70"
+                        : "bg-slate-700/70 group-hover:bg-sky-300/60"
+                    }`}
                   />
                 </div>
                 <div className="flex min-h-0 flex-1">

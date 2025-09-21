@@ -3,8 +3,8 @@ import { createReadStream, existsSync } from "node:fs";
 import type { Dirent } from "node:fs";
 import { mkdir, readdir, rename, stat, unlink } from "node:fs/promises";
 import { basename, dirname, extname, join } from "node:path";
-import { Worker } from "node:worker_threads";
 import { pathToFileURL } from "node:url";
+import { Worker } from "node:worker_threads";
 import {
   type Locale,
   defaultLocale,

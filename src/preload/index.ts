@@ -1,9 +1,9 @@
 import type { Locale, LocaleDescriptor } from "@shared/i18n";
 import type {
   DeletePhotoResult,
+  OpenDirectoryResult,
   PhotoCollectionPayload,
   PhotoMeta,
-  OpenDirectoryResult,
   RatingUpdatePayload,
   RatingUpdateResult,
   RatingsSyncPayload,

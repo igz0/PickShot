@@ -53,14 +53,10 @@
     "directories": {
       "output": "release"
     },
-    "files": [
-      "dist/**"
-    ],
+    "files": ["dist/**"],
     "asar": true,
     "mac": {
-      "target": [
-        "dmg"
-      ],
+      "target": ["dmg"],
       "category": "public.app-category.photography",
       "identity": null,
       "hardenedRuntime": false,
@@ -74,9 +70,7 @@
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64"
-          ]
+          "arch": ["x64"]
         }
       ]
     },

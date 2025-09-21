@@ -133,7 +133,9 @@ export default function StarFilterMenu({
                   onChange={() => handleToggle(value)}
                   disabled={disabled}
                 />
-                <span className="font-semibold text-indigo-100">{optionLabel}</span>
+                <span className="font-semibold text-indigo-100">
+                  {optionLabel}
+                </span>
                 <span className="ml-auto text-xs text-indigo-200/80">
                   {formatCount(count)}
                 </span>

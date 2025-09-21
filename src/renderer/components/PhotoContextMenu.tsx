@@ -26,8 +26,8 @@ export default function PhotoContextMenu({
   const deleteLabel =
     selectionCount > 1
       ? t("app.context.deleteSelected", {
-        count: formatNumber(selectionCount),
-      })
+          count: formatNumber(selectionCount),
+        })
       : t("app.context.delete");
   const anchoredPosition = useMemo(() => {
     const { innerWidth, innerHeight } = window;

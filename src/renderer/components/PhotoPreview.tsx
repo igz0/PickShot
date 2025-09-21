@@ -45,10 +45,7 @@ export default function PhotoPreview({
   const { t, formatDate, formatNumber } = useI18n();
   const selectionCount = photos.length;
 
-  const selectionIds = useMemo(
-    () => photos.map((photo) => photo.id),
-    [photos],
-  );
+  const selectionIds = useMemo(() => photos.map((photo) => photo.id), [photos]);
 
   const hasMixedRatings = useMemo(() => {
     if (photos.length <= 1) {
@@ -57,7 +54,7 @@ export default function PhotoPreview({
     const first = photos[0]?.rating ?? 0;
     return photos.some((photo) => photo.rating !== first);
   }, [photos]);
-  const displayRating = hasMixedRatings ? 0 : primaryPhoto?.rating ?? 0;
+  const displayRating = hasMixedRatings ? 0 : (primaryPhoto?.rating ?? 0);
 
   return (
     <div className="flex min-h-0 flex-col rounded-3xl w-full bg-[linear-gradient(175deg,_rgba(22,26,38,0.95),_rgba(12,14,24,0.92))] p-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.02),_0_20px_44px_rgba(0,0,0,0.32)]">
@@ -158,17 +155,15 @@ export default function PhotoPreview({
               onClick={() => onExpand(primaryPhoto)}
             >
               <div className="relative flex h-full w-full items-center justify-center">
-                {photos
-                  .slice(-STACK_DISPLAY_COUNT)
-                  .map((photo, index) => (
-                    <img
-                      key={photo.id}
-                      src={photo.fileUrl}
-                      alt={photo.name}
-                      className={`absolute h-5/6 w-5/6 rounded-3xl object-cover shadow-[0_18px_32px_rgba(0,0,0,0.35)] transition-transform duration-300 ${STACK_TRANSFORMS[index] ?? ""}`}
-                      style={{ zIndex: index + 1 }}
-                    />
-                  ))}
+                {photos.slice(-STACK_DISPLAY_COUNT).map((photo, index) => (
+                  <img
+                    key={photo.id}
+                    src={photo.fileUrl}
+                    alt={photo.name}
+                    className={`absolute h-5/6 w-5/6 rounded-3xl object-cover shadow-[0_18px_32px_rgba(0,0,0,0.35)] transition-transform duration-300 ${STACK_TRANSFORMS[index] ?? ""}`}
+                    style={{ zIndex: index + 1 }}
+                  />
+                ))}
                 {selectionCount > STACK_DISPLAY_COUNT ? (
                   <div className="absolute bottom-4 right-4 rounded-full bg-slate-950/80 px-4 py-1 text-xs font-semibold text-indigo-100 shadow-lg">
                     +{formatNumber(selectionCount - STACK_DISPLAY_COUNT)}
@@ -189,8 +184,8 @@ export default function PhotoPreview({
                     : primaryPhoto.rating === 0
                       ? t("photoPreview.multiUnifiedRatingNone")
                       : t("photoPreview.multiUnifiedRating", {
-                        rating: primaryPhoto.rating,
-                      })}
+                          rating: primaryPhoto.rating,
+                        })}
                 </span>
               </div>
               <div className="flex flex-col gap-2">
@@ -212,7 +207,9 @@ export default function PhotoPreview({
                   {selectionCount > LIST_DISPLAY_COUNT ? (
                     <li className="truncate text-indigo-300/80">
                       {t("photoPreview.multiMore", {
-                        count: formatNumber(selectionCount - LIST_DISPLAY_COUNT),
+                        count: formatNumber(
+                          selectionCount - LIST_DISPLAY_COUNT,
+                        ),
                       })}
                     </li>
                   ) : null}
