@@ -271,6 +271,19 @@ export default function App() {
     }
   }, [applyCollection]);
 
+  const handleClearDirectory = useCallback(() => {
+    setPhotos([]);
+    setSelectedId(null);
+    setDirectory(null);
+    setExpandedPhotoId(null);
+    setContextMenu(null);
+    setRenameTarget(null);
+    setRenameValue("");
+    setIsRenaming(false);
+    setIsDragOverDropZone(false);
+    dragDepthRef.current = 0;
+  }, []);
+
   const handleRate = useCallback(
     (id: string, rating: number) => {
       const isFilterActive = filterMode === "rated" || filterMode === "unrated";
@@ -1123,7 +1136,7 @@ export default function App() {
           {directory ? (
             <motion.div
               key="directory"
-              className="flex flex-wrap gap-2"
+              className="flex flex-wrap items-center gap-2"
               layout
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
@@ -1141,6 +1154,28 @@ export default function App() {
                   {formatPhotoCount(directory.count)}
                 </span>
               </span>
+              <button
+                type="button"
+                onClick={handleClearDirectory}
+                className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-indigo-400/40 bg-indigo-500/10 text-indigo-100 transition hover:bg-indigo-400/30 hover:text-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300 disabled:cursor-not-allowed disabled:opacity-50"
+                title={t("app.actions.clearFolder")}
+                aria-label={t("app.actions.clearFolder")}
+                disabled={isLoading}
+              >
+                <svg
+                  aria-hidden="true"
+                  focusable="false"
+                  viewBox="0 0 16 16"
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                >
+                  <path d="m4 4 8 8" />
+                  <path d="m12 4-8 8" />
+                </svg>
+              </button>
             </motion.div>
           ) : null}
         </AnimatePresence>
