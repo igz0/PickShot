@@ -97,7 +97,7 @@ export default function StarFilterMenu({
         aria-haspopup="true"
         aria-expanded={isOpen}
         aria-label={label}
-        className={`inline-flex items-center gap-2 rounded-full border border-indigo-300/60 bg-indigo-900/60 mt-1 px-4 py-2 text-xs font-semibold text-indigo-100 transition focus:outline-none focus:ring-2 focus:ring-indigo-400/60 ${disabled ? "pointer-events-none" : "hover:bg-indigo-800/70"}`}
+        className={`inline-flex items-center gap-2 rounded-full border border-indigo-300/60 bg-indigo-900/60 px-4 py-3 text-xs font-semibold text-indigo-100 transition focus:outline-none focus:ring-2 focus:ring-indigo-400/60 ${disabled ? "pointer-events-none" : "hover:bg-indigo-800/70"}`}
         onClick={() => {
           if (disabled) return;
           if (closeTimeout.current !== null) {
