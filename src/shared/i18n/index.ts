@@ -65,7 +65,7 @@ const en = {
   "app.language.label": "Language",
   "app.preview.resizeHandle": "Resize preview panel",
   "app.shortcuts.actions": "Actions",
-  "app.shortcuts.actionsClose": "Close shortcuts panel",
+  "app.shortcuts.actionsClose": "Clear selection",
   "app.shortcuts.actionsDelete": "Delete the selected photo",
   "app.shortcuts.actionsFilter": "Toggle filter (all / rated / unrated)",
   "app.shortcuts.actionsLoadFolder": "Load folder",
@@ -170,7 +170,7 @@ const ja: typeof en = {
   "app.language.label": "言語",
   "app.preview.resizeHandle": "プレビュー幅の調整ハンドル",
   "app.shortcuts.actions": "操作",
-  "app.shortcuts.actionsClose": "ショートカット一覧を閉じる",
+  "app.shortcuts.actionsClose": "画像選択を解除",
   "app.shortcuts.actionsDelete": "選択中の画像を削除",
   "app.shortcuts.actionsFilter":
     "表示フィルターを切り替え (すべて / 星あり / 星なし)",

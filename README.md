@@ -37,6 +37,7 @@ https://github.com/user-attachments/assets/1f9b17a2-0833-4e67-91cd-03d7ab999726
 - `F`: Cycle the visibility filter (all / rated / unrated)
 - `S`: Cycle sort order
 - `Delete / Backspace`: Move the selected photo to the trash
+- `Esc`: Clear the current selection
 - `Shift + ?`: Toggle the shortcuts overlay
 
 ## Data Persistence & Metadata Sync
