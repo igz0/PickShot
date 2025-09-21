@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
 import type { Dirent } from "node:fs";
-import { mkdir, readdir, rename, stat } from "node:fs/promises";
+import { mkdir, readdir, rename, stat, unlink } from "node:fs/promises";
 import { basename, dirname, extname, join } from "node:path";
+import { Worker } from "node:worker_threads";
 import { pathToFileURL } from "node:url";
 import {
   type Locale,
@@ -13,13 +14,13 @@ import {
 } from "@shared/i18n";
 import type {
   DeletePhotoResult,
+  OpenDirectoryResult,
   PhotoCollectionPayload,
   PhotoMeta,
   RatingUpdatePayload,
   RatingUpdateResult,
   RenamePhotoPayload,
   RenamePhotoResult,
-  OpenDirectoryResult,
   RevealPhotoResult,
 } from "@shared/types";
 import {
@@ -33,6 +34,7 @@ import {
   shell,
 } from "electron";
 import sharp from "sharp";
+import type { JpegOptions } from "sharp";
 import {
   deleteRating,
   getAllRatings,
@@ -83,6 +85,8 @@ const IMAGE_EXTENSIONS = new Set([
   "tif",
   "svg",
   "avif",
+  "heic",
+  "heif",
 ]);
 
 const MIME_TYPE_BY_EXT: Record<string, string> = {
@@ -96,6 +100,8 @@ const MIME_TYPE_BY_EXT: Record<string, string> = {
   tif: "image/tiff",
   svg: "image/svg+xml",
   avif: "image/avif",
+  heic: "image/heic",
+  heif: "image/heif",
 };
 
 const THUMBNAIL_SCHEME = "photo-thumb";
@@ -105,6 +111,267 @@ const THUMBNAIL_QUALITY = 80;
 const THUMBNAIL_JOB_CONCURRENCY = 2;
 
 let cachedThumbnailDir: string | null = null;
+let cachedMediaCacheDir: string | null = null;
+
+interface MediaTranscodeRule {
+  preferSharp: boolean;
+  fallback?: "heic-convert";
+  format: "jpeg";
+  mime: string;
+  extension: string;
+  options?: JpegOptions;
+}
+
+const MEDIA_TRANSCODE_RULES: Record<string, MediaTranscodeRule> = {
+  heic: {
+    preferSharp: true,
+    fallback: "heic-convert",
+    format: "jpeg",
+    mime: "image/jpeg",
+    extension: "jpg",
+    options: {
+      quality: 92,
+      mozjpeg: true,
+    },
+  },
+  heif: {
+    preferSharp: true,
+    fallback: "heic-convert",
+    format: "jpeg",
+    mime: "image/jpeg",
+    extension: "jpg",
+    options: {
+      quality: 92,
+      mozjpeg: true,
+    },
+  },
+};
+
+const mediaTranscodeTasks = new Map<string, Promise<string>>();
+let heicSharpDecodeAvailable: boolean | null = null;
+
+interface HeicWorkerRequest {
+  id: number;
+  filePath: string;
+  targetPath: string;
+  quality: number;
+}
+
+interface HeicWorkerResponse {
+  id: number;
+  status: "ok" | "error";
+  error?: {
+    message: string;
+    code?: string;
+  };
+}
+
+let heicWorker: Worker | null = null;
+const heicWorkerTasks = new Map<
+  number,
+  {
+    resolve: () => void;
+    reject: (error: unknown) => void;
+  }
+>();
+let heicWorkerRequestId = 0;
+
+function isHeicDecodePluginError(error: unknown): boolean {
+  if (!error) return false;
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("no decoding plugin installed") ||
+    normalized.includes("bad seek") ||
+    normalized.includes("no decoding plugin for this compression format")
+  );
+}
+
+function serializeWorkerError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+  const err = new Error(
+    typeof error === "object" && error
+      ? JSON.stringify(error)
+      : String(error ?? "Unknown worker error"),
+  );
+  return err;
+}
+
+function rejectAllHeicWorkerTasks(error: unknown): void {
+  const rejection = serializeWorkerError(error);
+  for (const task of heicWorkerTasks.values()) {
+    task.reject(rejection);
+  }
+  heicWorkerTasks.clear();
+}
+
+async function ensureHeicWorker(): Promise<Worker> {
+  if (heicWorker) {
+    return heicWorker;
+  }
+
+  const workerScript = new URL("./media/heicWorker.js", import.meta.url);
+  const worker = new Worker(workerScript, { type: "module" });
+
+  worker.on("message", (payload: HeicWorkerResponse) => {
+    const pending = heicWorkerTasks.get(payload.id);
+    if (!pending) {
+      return;
+    }
+    heicWorkerTasks.delete(payload.id);
+    if (payload.status === "ok") {
+      pending.resolve();
+      return;
+    }
+    const error = new Error(payload.error?.message ?? "HEIC transcode failed");
+    if (payload.error?.code) {
+      (error as NodeJS.ErrnoException).code = payload.error.code;
+    }
+    pending.reject(error);
+  });
+
+  worker.on("error", (error) => {
+    rejectAllHeicWorkerTasks(error);
+    heicWorker = null;
+  });
+
+  worker.on("exit", (code) => {
+    if (code !== 0) {
+      rejectAllHeicWorkerTasks(
+        new Error(`HEIC worker exited unexpectedly with code ${code}`),
+      );
+    }
+    heicWorker = null;
+  });
+
+  worker.unref();
+  heicWorker = worker;
+  return worker;
+}
+
+async function transcodeHeicWithWorker(
+  filePath: string,
+  targetPath: string,
+  quality: number,
+): Promise<void> {
+  const worker = await ensureHeicWorker();
+  const id = ++heicWorkerRequestId;
+  return new Promise((resolve, reject) => {
+    heicWorkerTasks.set(id, { resolve, reject });
+    const payload: HeicWorkerRequest = {
+      id,
+      filePath,
+      targetPath,
+      quality,
+    };
+    worker.postMessage(payload);
+  });
+}
+
+async function ensureTranscodedMediaAsset(
+  filePath: string,
+  sourceModifiedAt: number,
+  rule: MediaTranscodeRule,
+): Promise<string> {
+  const directory = await ensureMediaCacheDir();
+  const hash = createHash("sha1").update(filePath).digest("hex");
+  const targetPath = join(directory, `${hash}.${rule.extension}`);
+
+  if (await isCacheEntryFresh(targetPath, sourceModifiedAt)) {
+    return targetPath;
+  }
+
+  const existingTask = mediaTranscodeTasks.get(targetPath);
+  if (existingTask) {
+    try {
+      await existingTask;
+    } catch (error) {
+      // Ignore task failure here; a new attempt will run below
+    }
+    if (await isCacheEntryFresh(targetPath, sourceModifiedAt)) {
+      return targetPath;
+    }
+  }
+
+  const conversionTask = (async () => {
+    try {
+      let preferSharp = rule.preferSharp;
+      if (
+        preferSharp &&
+        rule.fallback === "heic-convert" &&
+        heicSharpDecodeAvailable === false
+      ) {
+        preferSharp = false;
+      }
+
+      let hadSharpError = false;
+
+      if (preferSharp) {
+        try {
+          const pipeline = sharp(filePath).rotate();
+          if (rule.format === "jpeg") {
+            pipeline.jpeg(rule.options ?? {});
+          } else {
+            throw new Error(`Unsupported transcode format: ${rule.format}`);
+          }
+
+          await pipeline.toFile(targetPath);
+
+          if (rule.fallback === "heic-convert") {
+            heicSharpDecodeAvailable = true;
+          }
+
+          return targetPath;
+        } catch (error) {
+          if (
+            rule.fallback === "heic-convert" &&
+            isHeicDecodePluginError(error)
+          ) {
+            heicSharpDecodeAvailable = false;
+            hadSharpError = true;
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      if (rule.fallback === "heic-convert") {
+        await transcodeHeicWithWorker(
+          filePath,
+          targetPath,
+          rule.options?.quality ?? 92,
+        );
+        return targetPath;
+      }
+
+      if (hadSharpError) {
+        throw new Error(`Failed to transcode ${filePath} via fallback`);
+      }
+
+      throw new Error(`No available transcode strategy for ${filePath}`);
+    } catch (error) {
+      await unlink(targetPath).catch(() => {
+        // stale cache file is best-effort cleanup
+      });
+      throw error;
+    }
+  })();
+
+  mediaTranscodeTasks.set(targetPath, conversionTask);
+  try {
+    await conversionTask;
+  } finally {
+    mediaTranscodeTasks.delete(targetPath);
+  }
+
+  if (!(await isCacheEntryFresh(targetPath, sourceModifiedAt))) {
+    throw new Error(`Failed to prepare media cache for ${filePath}`);
+  }
+
+  return targetPath;
+}
 
 function normalizeTimestamp(value: number): number {
   return Math.trunc(value);
@@ -186,6 +453,19 @@ async function ensureThumbnailDir(): Promise<string> {
   return directory;
 }
 
+function getMediaCacheDir(): string {
+  if (!cachedMediaCacheDir) {
+    cachedMediaCacheDir = join(app.getPath("userData"), "media-cache");
+  }
+  return cachedMediaCacheDir;
+}
+
+async function ensureMediaCacheDir(): Promise<string> {
+  const directory = getMediaCacheDir();
+  await mkdir(directory, { recursive: true });
+  return directory;
+}
+
 function buildProtocolUrl(scheme: string, filePath: string): string {
   const fileUrl = pathToFileURL(filePath);
   return `${scheme}://local${fileUrl.pathname}`;
@@ -203,39 +483,69 @@ async function ensurePhotoProtocol() {
   }
 
   ses.protocol.registerStreamProtocol("photo", (request, callback) => {
-    try {
-      const url = new URL(request.url);
-      let filePath = decodeURIComponent(url.pathname);
-      if (process.platform === "win32" && filePath.startsWith("/")) {
-        filePath = filePath.slice(1);
-      }
+    void (async () => {
+      try {
+        const url = new URL(request.url);
+        let filePath = decodeURIComponent(url.pathname);
+        if (process.platform === "win32" && filePath.startsWith("/")) {
+          filePath = filePath.slice(1);
+        }
 
-      const stream = createReadStream(filePath);
-      stream.on("error", (error) => {
-        console.error(
-          "Failed to stream file for photo protocol",
-          error,
-          filePath,
-        );
-        callback({ statusCode: 404 });
-      });
-
-      stream.once("open", () => {
         const ext = extname(filePath).slice(1).toLowerCase();
-        const mimeType = MIME_TYPE_BY_EXT[ext] ?? "application/octet-stream";
+        const rule = ext ? MEDIA_TRANSCODE_RULES[ext] : undefined;
 
-        callback({
-          statusCode: 200,
-          headers: {
-            "Content-Type": mimeType,
-          },
-          data: stream,
+        let targetPath = filePath;
+        let mimeType = MIME_TYPE_BY_EXT[ext] ?? "application/octet-stream";
+
+        if (rule) {
+          try {
+            const info = await stat(filePath);
+            targetPath = await ensureTranscodedMediaAsset(
+              filePath,
+              info.mtimeMs,
+              rule,
+            );
+            mimeType = rule.mime;
+          } catch (error) {
+            const errno = error as NodeJS.ErrnoException;
+            if (errno?.code === "ENOENT") {
+              callback({ statusCode: 404 });
+              return;
+            }
+            console.error(
+              "Failed to prepare transcoded media",
+              filePath,
+              error,
+            );
+            callback({ statusCode: 500 });
+            return;
+          }
+        }
+
+        const stream = createReadStream(targetPath);
+        stream.on("error", (error) => {
+          console.error(
+            "Failed to stream file for photo protocol",
+            error,
+            targetPath,
+          );
+          callback({ statusCode: 404 });
         });
-      });
-    } catch (error) {
-      console.error("Failed to handle photo protocol", error);
-      callback({ error: -6 });
-    }
+
+        stream.once("open", () => {
+          callback({
+            statusCode: 200,
+            headers: {
+              "Content-Type": mimeType,
+            },
+            data: stream,
+          });
+        });
+      } catch (error) {
+        console.error("Failed to handle photo protocol", error);
+        callback({ error: -6 });
+      }
+    })();
   });
 }
 
@@ -284,8 +594,18 @@ async function isThumbnailFresh(
   targetPath: string,
   sourceModifiedAt: number,
 ): Promise<boolean> {
+  return isCacheEntryFresh(targetPath, sourceModifiedAt);
+}
+
+async function isCacheEntryFresh(
+  targetPath: string,
+  sourceModifiedAt: number,
+): Promise<boolean> {
   try {
     const info = await stat(targetPath);
+    if (info.size <= 0) {
+      return false;
+    }
     return info.mtimeMs >= sourceModifiedAt;
   } catch (error) {
     return false;
@@ -352,8 +672,36 @@ async function runThumbnailJob(job: ThumbnailJob): Promise<void> {
     isThumbnailFresh(retinaPath, sourceModifiedAt),
   ]);
 
+  const ext = extname(filePath).slice(1).toLowerCase();
+  const transcodeRule = MEDIA_TRANSCODE_RULES[ext ?? ""];
+
+  let pipelineSourcePath = filePath;
+
+  if (transcodeRule && transcodeRule.fallback === "heic-convert") {
+    if (heicSharpDecodeAvailable === null) {
+      try {
+        await sharp(filePath).metadata();
+        heicSharpDecodeAvailable = true;
+      } catch (error) {
+        if (isHeicDecodePluginError(error)) {
+          heicSharpDecodeAvailable = false;
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    if (heicSharpDecodeAvailable === false) {
+      pipelineSourcePath = await ensureTranscodedMediaAsset(
+        filePath,
+        sourceModifiedAt,
+        transcodeRule,
+      );
+    }
+  }
+
   const tasks: Array<Promise<sharp.OutputInfo>> = [];
-  const pipeline = sharp(filePath).rotate();
+  let pipeline = sharp(pipelineSourcePath).rotate();
 
   if (!baseFresh) {
     tasks.push(
@@ -388,7 +736,60 @@ async function runThumbnailJob(job: ThumbnailJob): Promise<void> {
   }
 
   if (tasks.length > 0) {
-    await Promise.all(tasks);
+    try {
+      await Promise.all(tasks);
+    } catch (error) {
+      if (
+        transcodeRule?.fallback === "heic-convert" &&
+        heicSharpDecodeAvailable !== false &&
+        isHeicDecodePluginError(error)
+      ) {
+        heicSharpDecodeAvailable = false;
+        pipelineSourcePath = await ensureTranscodedMediaAsset(
+          filePath,
+          sourceModifiedAt,
+          transcodeRule,
+        );
+        pipeline = sharp(pipelineSourcePath).rotate();
+        tasks.length = 0;
+        if (!baseFresh) {
+          tasks.push(
+            pipeline
+              .clone()
+              .resize({
+                width: THUMBNAIL_BASE_WIDTH,
+                withoutEnlargement: true,
+              })
+              .webp({
+                quality: THUMBNAIL_QUALITY,
+                effort: 4,
+              })
+              .toFile(basePath),
+          );
+        }
+        if (!retinaFresh) {
+          tasks.push(
+            pipeline
+              .clone()
+              .resize({
+                width: THUMBNAIL_RETINA_WIDTH,
+                withoutEnlargement: true,
+              })
+              .webp({
+                quality: THUMBNAIL_QUALITY,
+                effort: 4,
+              })
+              .toFile(retinaPath),
+          );
+        }
+
+        if (tasks.length > 0) {
+          await Promise.all(tasks);
+        }
+      } else {
+        throw error;
+      }
+    }
   }
 
   const [baseReady, retinaReady] = await Promise.all([
@@ -857,10 +1258,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(
     "directories:open",
-    async (
-      _event,
-      directoryPath: string,
-    ): Promise<OpenDirectoryResult> => {
+    async (_event, directoryPath: string): Promise<OpenDirectoryResult> => {
       try {
         if (!existsSync(directoryPath)) {
           return {
