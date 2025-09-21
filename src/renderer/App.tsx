@@ -383,12 +383,16 @@ export default function App() {
           ? displayedPhotos.findIndex((photo) => photo.id === current)
           : -1;
         const fallbackIndex = offset > 0 ? 0 : displayedPhotos.length - 1;
-        const index =
-          currentIndex === -1
-            ? fallbackIndex
-            : (currentIndex + offset + displayedPhotos.length) %
-            displayedPhotos.length;
-        return displayedPhotos[index]?.id ?? null;
+        if (currentIndex === -1) {
+          return displayedPhotos[fallbackIndex]?.id ?? null;
+        }
+
+        const nextIndex = currentIndex + offset;
+        if (nextIndex < 0 || nextIndex >= displayedPhotos.length) {
+          return displayedPhotos[currentIndex]?.id ?? null;
+        }
+
+        return displayedPhotos[nextIndex]?.id ?? null;
       });
     },
     [displayedPhotos],
