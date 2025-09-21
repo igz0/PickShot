@@ -10,6 +10,7 @@ interface PhotoPreviewProps {
   onSetRating: (ids: string[], rating: number) => void;
   onDelete: (photos: RatedPhoto[]) => void;
   onExpand: (photo: RatedPhoto) => void;
+  onReveal: (photo: RatedPhoto) => void;
 }
 
 function formatBytes(bytes: number): string {
@@ -39,6 +40,7 @@ export default function PhotoPreview({
   onSetRating,
   onDelete,
   onExpand,
+  onReveal,
 }: PhotoPreviewProps) {
   const { t, formatDate, formatNumber } = useI18n();
   const selectionCount = photos.length;
@@ -90,12 +92,36 @@ export default function PhotoPreview({
               />
             </button>
             <div className="flex flex-col gap-3 px-3 py-5">
-              <h2
-                className="text-lg font-semibold text-slate-50"
-                title={primaryPhoto.name}
-              >
-                {primaryPhoto.name}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2
+                  className="flex-1 truncate text-lg font-semibold text-slate-50"
+                  title={primaryPhoto.name}
+                >
+                  {primaryPhoto.name}
+                </h2>
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 flex-none items-center justify-center rounded-full border border-indigo-400/40 bg-indigo-500/10 text-indigo-100 transition hover:border-indigo-300/60 hover:bg-indigo-500/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/70"
+                  onClick={() => onReveal(primaryPhoto)}
+                  aria-label={t("photoPreview.reveal")}
+                  title={t("photoPreview.reveal")}
+                >
+                  <svg
+                    aria-hidden="true"
+                    className="h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3.5 6a1.5 1.5 0 0 1 1.5-1.5h5l1.5 1.5H19a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 16.5z" />
+                    <path d="M10 12h6" />
+                    <path d="M10 15h3" />
+                  </svg>
+                </button>
+              </div>
               <div className="flex gap-4 text-sm text-indigo-200">
                 <span>{formatBytes(primaryPhoto.size)}</span>
                 <span>{formatDate(primaryPhoto.modifiedAt)}</span>

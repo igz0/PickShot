@@ -1768,6 +1768,7 @@ export default function App() {
                     onSetRating={applyUniformRating}
                     onDelete={deletePhotos}
                     onExpand={handleExpand}
+                    onReveal={handleReveal}
                   />
                 </div>
               </div>
@@ -1780,6 +1781,7 @@ export default function App() {
                 onSetRating={applyUniformRating}
                 onDelete={deletePhotos}
                 onExpand={handleExpand}
+                onReveal={handleReveal}
               />
             </div>
           )}
